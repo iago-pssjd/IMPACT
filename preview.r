@@ -19,6 +19,7 @@ if(Sys.info()["sysname"] == "Linux"){
 # Libraries ---------------------------------------------------------------
 
 library(haven)
+library(data.table)
 library(gimme)
 
 
@@ -35,4 +36,6 @@ impactdt <- read_sav(paste0(data_path, "Dataset_IMPACT-EMA_v2.sav"))
 
 
 impactdt <- as_factor(impactdt)
-
+setDT(impactdt)
+setDF(impactdt)
+save(impactdt, file = paste0(data_path, "Dataset_IMPACT-EMA_v2.rdata"))
