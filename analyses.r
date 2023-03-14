@@ -1,7 +1,3 @@
-# preview.r
-
-
-# OS dependencies ----------------------------------------------------------
 
 
 if(Sys.info()["sysname"] == "Linux"){
@@ -24,18 +20,7 @@ library(gimme)
 
 
 
-
 # Data loading --------------------------------------------------------------
 
 impactdt <- read_sav(paste0(data_path, "Dataset_IMPACT-EMA_v2.sav"))
 
-
-
-
-# Data arranging and merging ----------------------------------------------
-
-
-impactdt <- as_factor(impactdt)
-setDT(impactdt)
-setDF(impactdt)
-save(impactdt, file = paste0(data_path, "Dataset_IMPACT-EMA_v2.rdata"))
