@@ -20,6 +20,7 @@ if(Sys.info()["sysname"] == "Linux"){
 
 library(ggplot2)
 library(haven)
+library(matrixStats)
 library(data.table)
 library(gimme)
 
@@ -63,6 +64,9 @@ impactdt[, lapply(.SD, \(.x) sum(is.na(.x))), keyby = .(ParticipantID, Gender, A
 lapply(unregular_missings, \(.x) median(impactdt[, lapply(.SD, \(.x) sum(is.na(.x))), by = .(ParticipantID)][[.x]]))
 
 lapply(unregular_missings, \(.y) ggplot(impactdt[, tp := seq_len(.N), by = ParticipantID][, lapply(.SD, \(.x) sum(is.na(.x))), .SDcols = unregular_missings, keyby = tp], aes_string(x = "tp", y = .y)) + geom_bar(stat="identity"))
+
+
+impactdt[, lapply(.SD, \(.x) uniqueN(.x) - any(is.na(.x))), by = ParticipantID, .SDcols = unregular_missings][, mc := rowMins(as.matrix(.SD)), .SDcols = !c('ParticipantID')][mc <= 1]
 
 
 # Data saving ----------------------------------------------
