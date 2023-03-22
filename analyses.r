@@ -14,11 +14,33 @@ options(max.print=99999)
 
 # Libraries ---------------------------------------------------------------
 
+library(ggplot2)
+library(matrixStats)
 library(haven)
-# library(nlme)
-library(lme4)
+library(nlme)
+# library(lme4)
 library(data.table)
 library(gimme)
+
+
+
+# Auxiliar functions ------------------------------------------------------
+
+
+
+getRESE.ranef.lme <- function(x){
+  ss <- stack(x)
+  ss$ind <- factor(as.character(ss$ind), levels = colnames(x))
+  ss$.nn <- rep.int(reorder(factor(rownames(x)), x[[1]], 
+        FUN = mean, sort = sort), ncol(x))
+  pv <- attr(x, "postVar")
+}
+
+# Data loading --------------------------------------------------------------
+
+impactdt <- read_sav(paste0(data_path, "Dataset_IMPACT-EMA_v2.sav"))
+impactdt <- as_factor(impactdt)
+setDT(impactdt)
 
 
 
@@ -30,23 +52,15 @@ sOUTCOMES <- c("Sadness", "PainIntensity", "PainControl", "SleepDisturb", "Stres
 outcomes <- c(pOUTCOMES, sOUTCOMES)
 processes <- setdiff(EMA, outcomes)
 
-# Data loading --------------------------------------------------------------
-
-impactdt <- read_sav(paste0(data_path, "Dataset_IMPACT-EMA_v2.sav"))
-
-
-
 
 
 # Data arranging ----------------------------------------------
 
-impactdt <- as_factor(impactdt)
-setDT(impactdt)
 impactdtres <- impactdt[!ParticipantID %in% impactdt[, lapply(.SD, \(.x) uniqueN(.x) - any(is.na(.x))), by = ParticipantID, .SDcols = EMA][, min_var := rowMins(as.matrix(.SD)), .SDcols = !c('ParticipantID')][min_var <= 1]$ParticipantID]
 
-chisq <- pchisq <- matrix(nrow = length(processes), ncol = length(outcomes))
-rownames(chisq) <- rownames(pchisq) <- processes
-colnames(chisq) <- colnames(pchisq) <- outcomes
+beta10 <- beta90 <- beta <- chisq <- pchisq <- matrix(nrow = length(processes), ncol = length(outcomes))
+rownames(beta10) <- rownames(beta90) <- rownames(beta) <- rownames(chisq) <- rownames(pchisq) <- processes
+colnames(beta10) <- colnames(beta90) <- colnames(beta) <- colnames(chisq) <- colnames(pchisq) <- outcomes
 
 # Multilevel analyses -----------------------------------------------------
 
@@ -54,13 +68,20 @@ for(ixout in seq_along(outcomes)){
   for(ixproc in seq_along(processes)){
     iout <- outcomes[ixout]
     iproc <- processes[ixproc]
-    # rimodel <- lme(reformulate(iproc, response = iout), data = impactdtres, random = ~ 1 | ParticipantID, method = "ML", na.action = na.omit)
-    # rsmodel <- lme(reformulate(iproc, response = iout), data = impactdtres, random = as.formula(paste("~", iproc, "| ParticipantID")), method = "ML", na.action = na.omit)
-    rimodel <- lmer(paste0(iout, " ~ ", iproc, " + (1|ParticipantID)"), data = impactdtres, REML = FALSE)
-    rsmodel <- lmer(paste0(iout, " ~ ", iproc, " + (", iproc,"|ParticipantID)"), data = impactdtres, REML = FALSE)
-    # ranef(rsmodel)[["ParticipantID"]][,"(Intercept)"]
-    # ranef(rsmodel)[["ParticipantID"]][,iproc]
-    chisq[ixproc, ixout] <- anova(rsmodel, rimodel, test = "Chisq")[["Chisq"]][2]
-    pchisq[ixproc, ixout] <- anova(rsmodel, rimodel, test = "Chisq")[["Pr(>Chisq)"]][2]
+    rimodel <- lme(reformulate(iproc, response = iout), data = impactdtres, random = ~ 1 | ParticipantID, method = "ML", na.action = na.omit)
+    rsmodel <- lme(reformulate(iproc, response = iout), data = impactdtres, random = as.formula(paste("~", iproc, "| ParticipantID")), method = "ML", na.action = na.omit)
+    # rimodel <- lmer(paste0(iout, " ~ ", iproc, " + (1|ParticipantID)"), data = impactdtres, REML = FALSE)
+    rsmodel2 <- lmer(paste0(iout, " ~ ", iproc, " + (", iproc,"|ParticipantID)"), data = impactdtres, REML = FALSE)
+    # ranef(rsmodel)[["ParticipantID"]][,"(Intercept)"] # merMod methods
+    # ranef(rsmodel)[["ParticipantID"]][,iproc] # merMod methods
+    chisq[ixproc, ixout] <- anova(rsmodel, rimodel)[["L.Ratio"]][2]
+    pchisq[ixproc, ixout] <- anova(rsmodel, rimodel)[["p-value"]][2]
+    beta[ixproc, ixout] <- fixef(rsmodel)[[iproc]]
+    beta10[ixproc, ixout] <- quantile(coef(rsmodel)[[iproc]], probs = c(0.1))
+    beta90[ixproc, ixout] <- quantile(coef(rsmodel)[[iproc]], probs = c(0.9))
+    # plot(compareFits(coef(rsmodel), coef(rimodel)), mark = fixef(rsmodel))
+    plot(coef(rsmodel), panel = function(...) {panel.dotplot(..., col = 'darkgreen'); panel.abline(v = fixef(rsmodel), lty = 3, col = 'purple')})
   }
 }
+
+coef(rsmodel)
