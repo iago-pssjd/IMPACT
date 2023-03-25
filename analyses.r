@@ -1,7 +1,12 @@
 
 
 if(Sys.info()["sysname"] == "Linux"){
-	data_path <- "~/Dropbox/juanpablo spanish pain study/"
+	data_path <- paste0("/media/", 
+			    system("whoami", intern = TRUE), 
+			    "/", 
+			    system(paste0("ls /media/", system("whoami", intern = TRUE)), intern = TRUE), 
+			    "/Dropbox/juanpablo spanish pain study/")
+	data_path <- data_path[file.exists(data_path)]
 	dev_lib_path <- "~/R/x86_64-pc-linux-gnu-library/dev"
 } else if(Sys.info()["sysname"] == "Windows"){
 	data_path <- paste0(grep("^[A-Z]:$", sub(":(.*)", ":",shell("wmic logicaldisk get name", intern = TRUE)), value = TRUE), "/NCext/PSSJD_other/IMPACT")
@@ -23,48 +28,61 @@ library(lme4)
 library(data.table)
 library(gimme)
 
-
+dot.symbol <- trellis.par.get("dot.symbol")
+dot.symbol$col <- 'darkgreen'
+trellis.par.set("dot.symbol", dot.symbol)
 
 # Auxiliar functions ------------------------------------------------------
 
-prepanel.ci <- function(x, y, se, subscripts, ...) {
-        if (is.null(se)) 
-            return(list())
-        x <- as.numeric(x)
-        hw <- 1.96 * as.numeric(se[subscripts])
-        list(xlim = range(transf(x - hw), transf(x + hw), finite = TRUE))
+dotplot.lmerMod <- function (x, data, main = TRUE, transf = I, ...) {
+  xf <- fixef(x)
+  x <- ranef(x, condVar = TRUE)
+  for(grf in names(x)){
+    for(erf in names(x[[grf]]))
+      x[[grf]][, erf] <- x[[grf]][, erf] + xf[erf]
+  }
+  dotplot(x, data = data, main = main, transf = I, v = xf, ...)
+}
+  
+
+dotplot.ranef.mer <- function (x, data, main = TRUE, transf = I, ...) 
+{
+  prepanel.ci <- function(x, y, se, subscripts, ...) {
+    if (is.null(se)) 
+      return(list())
+    x <- as.numeric(x)
+    hw <- 1.96 * as.numeric(se[subscripts])
+    list(xlim = range(transf(x - hw), transf(x + hw), finite = TRUE))
+  }
+  panel.ci <- function(x, y, se, subscripts, pch = 16, horizontal = TRUE, v = 0,
+                       col = dot.symbol$col, cex = dot.symbol$cex, lty.h = dot.line$lty, lty.v = dot.line$lty, lwd.h = dot.line$lwd, lwd.v = dot.line$lwd, 
+                       col.line.h = dot.line$col, col.line.v = dot.line$col, levels.fos = unique(y), groups = NULL, 
+                       ...) {
+    x <- as.numeric(x)
+    y <- as.numeric(y)
+    dot.line <- trellis.par.get("dot.line")
+    dot.symbol <- trellis.par.get("dot.symbol")
+    sup.symbol <- trellis.par.get("superpose.symbol")
+    panel.abline(h = levels.fos, col = col.line.h, lty = lty.h, 
+                 lwd = lwd.h)
+    panel.abline(v = v[panel.number()], col = col.line.v, lty = lty.v, lwd = lwd.v)
+    if (!is.null(se)) {
+      se <- as.numeric(se[subscripts])
+      panel.segments(transf(x - 1.96 * se), y, transf(x + 
+                                                        1.96 * se), y, col = "black")
+    }
+    panel.xyplot(transf(x), y, pch = pch, col = col, cex = cex, ...)
+  }
+  f <- function(nx, ...) {
+    ss <- lme4:::asDf0(x, nx)
+    mtit <- if (main) 
+      nx
+    dotplot(.nn ~ values | ind, ss, se = ss$se, prepanel = prepanel.ci, 
+            panel = panel.ci, xlab = NULL, main = mtit, ...)
+  }
+  setNames(lapply(names(x), f, ...), names(x))
 }
 
-panel.ci <- function(x, y, se, subscripts, pch = 16, horizontal = TRUE, 
-        col = dot.symbol$col, lty = dot.line$lty, lwd = dot.line$lwd, 
-        col.line = dot.line$col, levels.fos = unique(y), groups = NULL, 
-        ...) {
-        x <- as.numeric(x)
-        y <- as.numeric(y)
-        dot.line <- trellis.par.get("dot.line")
-        dot.symbol <- trellis.par.get("dot.symbol")
-        sup.symbol <- trellis.par.get("superpose.symbol")
-        panel.abline(h = levels.fos, col = col.line, lty = lty, 
-            lwd = lwd)
-        panel.abline(v = 0, col = col.line, lty = lty, lwd = lwd)
-        if (!is.null(se)) {
-            se <- as.numeric(se[subscripts])
-            panel.segments(transf(x - 1.96 * se), y, transf(x + 
-                1.96 * se), y, col = "black")
-        }
-        panel.xyplot(transf(x), y, pch = pch, ...)
-    }
-
-# https://stackoverflow.com/questions/51259346/how-to-get-names-of-dot-dot-dot-arguments-in-r
-f <- function(nx, main = TRUE, transf = I, ...) {
-  dots <- match.call(expand.dots = FALSE)$...
-
-          ss <- lme4:::asDf0(x, nx)
-        mtit <- if (main) 
-            nx
-        dotplot(.nn ~ values | ind, ss, se = ss$se, prepanel = prepanel.ci, 
-            panel = panel.ci, xlab = NULL, main = mtit, ...)
-    }
 
 
 # Data loading --------------------------------------------------------------
@@ -82,9 +100,6 @@ pOUTCOMES <- c("InterferLeasure", "InterferSocial", "InterferWork")
 sOUTCOMES <- c("Sadness", "PainIntensity", "PainControl", "SleepDisturb", "Stress")
 outcomes <- c(pOUTCOMES, sOUTCOMES)
 processes <- setdiff(EMA, outcomes)
-superpose.symbol <- trellis.par.get("superpose.symbol")
-superpose.symbol$fill[5] <- 'lightgreen'
-trellis.par.set("superpose.symbol", superpose.symbol)
 
 
 # Data arranging ----------------------------------------------
