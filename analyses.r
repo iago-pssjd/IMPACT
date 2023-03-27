@@ -45,11 +45,10 @@ dotplot.lmerMod <- function (x, data, main = TRUE, transf = I, ...) {
 }
   
 
-dotplot.ranef.mer <- function (x, data, main = TRUE, transf = I, ...) 
+dotplot.ranef.mer <- function(x, data, main = TRUE, transf = I, ...) 
 {
   prepanel.ci <- function(x, y, se, subscripts, ...) {
-    if (is.null(se)) 
-      return(list())
+    if (is.null(se)) return(list())
     x <- as.numeric(x)
     hw <- 1.96 * as.numeric(se[subscripts])
     list(xlim = range(transf(x - hw), transf(x + hw), finite = TRUE))
@@ -134,7 +133,7 @@ for(ixout in seq_along(outcomes)){
     beta10[ixproc, ixout] <- quantile(coef(rsmodel)[["ParticipantID"]][[iproc]], probs = c(0.1))
     beta90[ixproc, ixout] <- quantile(coef(rsmodel)[["ParticipantID"]][[iproc]], probs = c(0.9))
     # plot(compareFits(coef(rsmodel), coef(rimodel)), mark = fixef(rsmodel))
-    dotplot(ranef(rsmodel, condVar = TRUE), col = 'darkgreen')
+    dotplot(rsmodel, col = 'darkgreen', col.line.v = 'purple', lty.v = 3, scales = list(x = list(relation = 'free')))[["ParticipantID"]]
   }
 }
 
