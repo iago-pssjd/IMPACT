@@ -110,12 +110,13 @@ colnames(beta10) <- colnames(beta90) <- colnames(beta) <- colnames(chisq) <- col
 
 # Multilevel analyses -----------------------------------------------------
 
+
 for(ixout in seq_along(outcomes)){
 	for(ixproc in seq_along(processes)){
 		iout <- outcomes[ixout]
 		iproc <- processes[ixproc]
-		rimodel <- lmer(paste0(iout, " ~ ", iproc, " + (1|ParticipantID)"), data = impactdtres, REML = FALSE, lmerControl(optimizer = "Nelder_Mead"))
-		rsmodel <- lmer(paste0(iout, " ~ ", iproc, " + (", iproc,"|ParticipantID)"), data = impactdtres, REML = FALSE, lmerControl(optimizer = "Nelder_Mead"))
+		rimodel <- lmer(paste0(iout, " ~ ", iproc, " + (1|ParticipantID)"), data = impactdtres, REML = FALSE, control = lmerControl(optimizer = "bobyqa"))
+		rsmodel <- lmer(paste0(iout, " ~ ", iproc, " + (", iproc,"|ParticipantID)"), data = impactdtres, REML = FALSE, control = lmerControl(optimizer = "bobyqa"))
 		chisq[ixproc, ixout] <- anova(rsmodel, rimodel)[["Chisq"]][2]
 		pchisq[ixproc, ixout] <- anova(rsmodel, rimodel)[["Pr(>Chisq)"]][2]
 		beta[ixproc, ixout] <- fixef(rsmodel)[[iproc]]
@@ -123,7 +124,7 @@ for(ixout in seq_along(outcomes)){
 		beta90[ixproc, ixout] <- quantile(coef(rsmodel)[["ParticipantID"]][[iproc]], probs = c(0.9))
 		if(Sys.info()["sysname"] == "Windows"){
 		  png(paste0(data_path, "graphics/", iout, "-", iproc, ".png"), bg = "transparent")
-		  print(dotplot(rsmodel, col = 'darkgreen', col.line.v = 'purple', lty.v = 3, scales = list(x = list(relation = 'free'), y = list(draw = FALSE)), par.settings = list(strip.border = list(alpha = 0)), strip = strip.custom(factor.levels = c("Intercept (Z score)", "Slope (beta)"), bg = "transparent"))[["ParticipantID"]])
+		  print(dotplot(rsmodel, col = 'darkgreen', col.line.v = 'purple', lty.v = 3, scales = list(y = list(draw = FALSE)), par.settings = list(strip.border = list(alpha = 0)), strip = strip.custom(factor.levels = c("Intercept (Z score)", "Slope (beta)"), bg = "transparent"))[["ParticipantID"]])
 		  dev.off()
 		}
 	}
@@ -132,6 +133,40 @@ sheet_list <- list("chi-square" = chisq, "chi-square p-value" = pchisq, "beta" =
 for(sheetname in names(sheet_list)){
   addWorksheet(wb, sheetName = sheetname)
   writeData(wb, sheet = sheetname, sheet_list[[sheetname]], rowNames = TRUE)
+}
+
+
+for(arm in levels(impactdtres$Arm)){
+  beta10 <- beta90 <- beta <- chisq <- pchisq <- matrix(nrow = length(processes), ncol = length(outcomes))
+  rownames(beta10) <- rownames(beta90) <- rownames(beta) <- rownames(chisq) <- rownames(pchisq) <- processes
+  colnames(beta10) <- colnames(beta90) <- colnames(beta) <- colnames(chisq) <- colnames(pchisq) <- outcomes
+  sarm <- sub("\\+", "", arm, "/")
+  dir.create(paste0(data_path, "graphics/", sarm))
+
+  for(ixout in seq_along(outcomes)){
+    for(ixproc in seq_along(processes)){
+      iout <- outcomes[ixout]
+      iproc <- processes[ixproc]
+      rimodel <- lmer(paste0(iout, " ~ ", iproc, " + (1|ParticipantID)"), data = impactdtres, REML = FALSE, control = lmerControl(optimizer = "bobyqa"), subset = Arm == arm)      # print(summary(rimodel))
+      rsmodel <- lmer(paste0(iout, " ~ ", iproc, " + (", iproc,"|ParticipantID)"), data = impactdtres, REML = FALSE, control = lmerControl(optimizer = "bobyqa"), subset = Arm == arm)
+      chisq[ixproc, ixout] <- anova(rsmodel, rimodel)[["Chisq"]][2]
+      pchisq[ixproc, ixout] <- anova(rsmodel, rimodel)[["Pr(>Chisq)"]][2]
+      beta[ixproc, ixout] <- fixef(rsmodel)[[iproc]]
+      beta10[ixproc, ixout] <- quantile(coef(rsmodel)[["ParticipantID"]][[iproc]], probs = c(0.1))
+      beta90[ixproc, ixout] <- quantile(coef(rsmodel)[["ParticipantID"]][[iproc]], probs = c(0.9))
+      if(Sys.info()["sysname"] == "Windows"){
+        png(paste0(data_path, "graphics/", sarm, "/", iout, "-", iproc, ".png"), bg = "transparent")
+        print(dotplot(rsmodel, col = 'darkgreen', col.line.v = 'purple', lty.v = 3, scales = list(y = list(draw = FALSE)), par.settings = list(strip.border = list(alpha = 0)), strip = strip.custom(factor.levels = c("Intercept (Z score)", "Slope (beta)"), bg = "transparent"))[["ParticipantID"]])
+        dev.off()
+      }
+    }
+  }
+  sheet_list <- list("chi-square" = chisq, "chi-square p-value" = pchisq, "beta" = beta, "beta10" = beta10, "beta90" = beta90)
+  names(sheet_list) <- paste(names(sheet_list), sarm, sep = "-")
+  for(sheetname in names(sheet_list)){
+    addWorksheet(wb, sheetName = sheetname)
+    writeData(wb, sheet = sheetname, sheet_list[[sheetname]], rowNames = TRUE)
+  }
 }
 
 saveWorkbook(wb, paste0(data_path, "multilevel-models.xlsx"), overwrite = TRUE)
