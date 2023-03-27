@@ -20,12 +20,9 @@ options(max.print=99999)
 # Libraries ---------------------------------------------------------------
 
 library(openxlsx) # createWorkbook
-# library(optimx)
 library(lattice) # dotplot
-# library(ggplot2)
 library(matrixStats) # rowMins
 library(haven) # read_sav
-# library(nlme)
 library(lme4) # lmer
 library(data.table)
 # library(gimme)
@@ -104,6 +101,7 @@ processes <- setdiff(EMA, outcomes)
 
 # Data arranging ----------------------------------------------
 
+# remove 30 participants exhibiting no variability on at least one EMA item
 impactdtres <- impactdt[!ParticipantID %in% impactdt[, lapply(.SD, \(.x) uniqueN(.x) - any(is.na(.x))), by = ParticipantID, .SDcols = EMA][, min_var := rowMins(as.matrix(.SD)), .SDcols = !c('ParticipantID')][min_var <= 1]$ParticipantID]
 
 beta10 <- beta90 <- beta <- chisq <- pchisq <- matrix(nrow = length(processes), ncol = length(outcomes))
@@ -116,24 +114,13 @@ for(ixout in seq_along(outcomes)){
 	for(ixproc in seq_along(processes)){
 		iout <- outcomes[ixout]
 		iproc <- processes[ixproc]
-		# rimodel <- lme(reformulate(iproc, response = iout), data = impactdtres, random = ~ 1 | ParticipantID, method = "ML", na.action = na.omit)
-		# rsmodel <- lme(reformulate(iproc, response = iout), data = impactdtres, random = as.formula(paste("~", iproc, "| ParticipantID")), method = "ML", na.action = na.omit)
-		# chisq[ixproc, ixout] <- anova(rsmodel, rimodel)[["L.Ratio"]][2]
-		# pchisq[ixproc, ixout] <- anova(rsmodel, rimodel)[["p-value"]][2]
-		# beta10[ixproc, ixout] <- quantile(coef(rsmodel)[[iproc]], probs = c(0.1))
-		# beta90[ixproc, ixout] <- quantile(coef(rsmodel)[[iproc]], probs = c(0.9))
-		# plot(coef(rsmodel), panel = function(...) {panel.dotplot(..., col = 'darkgreen'); panel.abline(v = fixef(rsmodel), lty = 3, col = 'purple')})
-
 		rimodel <- lmer(paste0(iout, " ~ ", iproc, " + (1|ParticipantID)"), data = impactdtres, REML = FALSE, lmerControl(optimizer = "Nelder_Mead"))
 		rsmodel <- lmer(paste0(iout, " ~ ", iproc, " + (", iproc,"|ParticipantID)"), data = impactdtres, REML = FALSE, lmerControl(optimizer = "Nelder_Mead"))
-		# ranef(rsmodel)[["ParticipantID"]][,"(Intercept)"] # merMod methods
-		# ranef(rsmodel)[["ParticipantID"]][,iproc] # merMod methods
 		chisq[ixproc, ixout] <- anova(rsmodel, rimodel)[["Chisq"]][2]
 		pchisq[ixproc, ixout] <- anova(rsmodel, rimodel)[["Pr(>Chisq)"]][2]
 		beta[ixproc, ixout] <- fixef(rsmodel)[[iproc]]
 		beta10[ixproc, ixout] <- quantile(coef(rsmodel)[["ParticipantID"]][[iproc]], probs = c(0.1))
 		beta90[ixproc, ixout] <- quantile(coef(rsmodel)[["ParticipantID"]][[iproc]], probs = c(0.9))
-		# plot(compareFits(coef(rsmodel), coef(rimodel)), mark = fixef(rsmodel))
 		if(Sys.info()["sysname"] == "Windows"){
 		  png(paste0(data_path, "graphics/", iout, "-", iproc, ".png"), bg = "transparent")
 		  print(dotplot(rsmodel, col = 'darkgreen', col.line.v = 'purple', lty.v = 3, scales = list(x = list(relation = 'free'), y = list(draw = FALSE)), par.settings = list(strip.border = list(alpha = 0)), strip = strip.custom(factor.levels = c("Intercept (Z score)", "Slope (beta)"), bg = "transparent"))[["ParticipantID"]])
