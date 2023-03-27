@@ -19,7 +19,9 @@ options(max.print=99999)
 
 # Libraries ---------------------------------------------------------------
 
-library(lattice)
+library(openxlsx)
+library(optimx)
+# library(lattice)
 library(ggplot2)
 library(matrixStats)
 library(haven)
@@ -28,9 +30,6 @@ library(lme4)
 library(data.table)
 library(gimme)
 
-dot.symbol <- trellis.par.get("dot.symbol")
-dot.symbol$col <- 'darkgreen'
-trellis.par.set("dot.symbol", dot.symbol)
 
 # Auxiliar functions ------------------------------------------------------
 
@@ -85,13 +84,12 @@ dotplot.ranef.mer <- function(x, data, main = TRUE, transf = I, ...){
 }
 
 
-
 # Data loading --------------------------------------------------------------
 
 impactdt <- read_sav(paste0(data_path, "Dataset_IMPACT-EMA_v2.sav"))
 impactdt <- as_factor(impactdt)
 setDT(impactdt)
-
+wb <- createWorkbook()
 
 
 # Global variables --------------------------------------------------------
@@ -101,6 +99,7 @@ pOUTCOMES <- c("InterferLeasure", "InterferSocial", "InterferWork")
 sOUTCOMES <- c("Sadness", "PainIntensity", "PainControl", "SleepDisturb", "Stress")
 outcomes <- c(pOUTCOMES, sOUTCOMES)
 processes <- setdiff(EMA, outcomes)
+
 
 
 # Data arranging ----------------------------------------------
@@ -125,8 +124,8 @@ for(ixout in seq_along(outcomes)){
 		# beta90[ixproc, ixout] <- quantile(coef(rsmodel)[[iproc]], probs = c(0.9))
 		# plot(coef(rsmodel), panel = function(...) {panel.dotplot(..., col = 'darkgreen'); panel.abline(v = fixef(rsmodel), lty = 3, col = 'purple')})
 
-		rimodel <- lmer(paste0(iout, " ~ ", iproc, " + (1|ParticipantID)"), data = impactdtres, REML = FALSE)
-		rsmodel <- lmer(paste0(iout, " ~ ", iproc, " + (", iproc,"|ParticipantID)"), data = impactdtres, REML = FALSE)
+		rimodel <- lmer(paste0(iout, " ~ ", iproc, " + (1|ParticipantID)"), data = impactdtres, REML = FALSE, lmerControl(optimizer = "Nelder_Mead"))
+		rsmodel <- lmer(paste0(iout, " ~ ", iproc, " + (", iproc,"|ParticipantID)"), data = impactdtres, REML = FALSE, lmerControl(optimizer = "Nelder_Mead"))
 		# ranef(rsmodel)[["ParticipantID"]][,"(Intercept)"] # merMod methods
 		# ranef(rsmodel)[["ParticipantID"]][,iproc] # merMod methods
 		chisq[ixproc, ixout] <- anova(rsmodel, rimodel)[["Chisq"]][2]
@@ -135,8 +134,18 @@ for(ixout in seq_along(outcomes)){
 		beta10[ixproc, ixout] <- quantile(coef(rsmodel)[["ParticipantID"]][[iproc]], probs = c(0.1))
 		beta90[ixproc, ixout] <- quantile(coef(rsmodel)[["ParticipantID"]][[iproc]], probs = c(0.9))
 		# plot(compareFits(coef(rsmodel), coef(rimodel)), mark = fixef(rsmodel))
-		dotplot(rsmodel, col = 'darkgreen', col.line.v = 'purple', lty.v = 3, scales = list(x = list(relation = 'free')))[["ParticipantID"]]
+		if(Sys.info()["sysname"] == "Windows"){
+		  png(paste0(data_path, "graphics/", iout, "-", iproc, ".png"), bg = "transparent")
+		  print(dotplot(rsmodel, col = 'darkgreen', col.line.v = 'purple', lty.v = 3, scales = list(x = list(relation = 'free'), y = list(draw = FALSE)), par.settings = list(strip.border = list(alpha = 0)), strip = strip.custom(factor.levels = c("Intercept (Z score)", "Slope (beta)"), bg = "transparent"))[["ParticipantID"]])
+		  dev.off()
+		}
 	}
 }
+sheet_list <- list("chi-square" = chisq, "chi-square p-value" = pchisq, "beta" = beta, "beta10" = beta10, "beta90" = beta90)
+for(sheetname in names(sheet_list)){
+  addWorksheet(wb, sheetName = sheetname)
+  writeData(wb, sheet = sheetname, sheet_list[[sheetname]], rowNames = TRUE)
+}
 
-coef(rsmodel)
+saveWorkbook(wb, paste0(data_path, "multilevel-models.xlsx"), overwrite = TRUE)
+
