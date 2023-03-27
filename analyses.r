@@ -53,7 +53,7 @@ dotplot.ranef.mer <- function(x, data, main = TRUE, transf = I, ...){
 		list(xlim = range(transf(x - hw), transf(x + hw), finite = TRUE))
 	}
 	panel.ci <- function(x, y, se, subscripts, pch = 16, horizontal = TRUE, v = 0,
-			     col = dot.symbol$col, cex = dot.symbol$cex, lty.h = dot.line$lty, lty.v = dot.line$lty, lwd.h = dot.line$lwd, lwd.v = dot.line$lwd, 
+			     col = dot.symbol$col, lty.h = dot.line$lty, lty.v = dot.line$lty, lwd.h = dot.line$lwd, lwd.v = dot.line$lwd, 
 			     col.line.h = dot.line$col, col.line.v = dot.line$col, levels.fos = unique(y), groups = NULL, 
 			     ...){
 		x <- as.numeric(x)
@@ -61,15 +61,18 @@ dotplot.ranef.mer <- function(x, data, main = TRUE, transf = I, ...){
 		dot.line <- trellis.par.get("dot.line")
 		dot.symbol <- trellis.par.get("dot.symbol")
 		sup.symbol <- trellis.par.get("superpose.symbol")
-		panel.abline(h = levels.fos, col = col.line.h, lty = lty.h, 
-			     lwd = lwd.h)
-		panel.abline(v = v[panel.number()], col = col.line.v, lty = lty.v, lwd = lwd.v)
+		panel.abline(h = levels.fos, col = col.line.h, lty = lty.h, lwd = lwd.h)
+		if(length(v) == 1){
+		  panel.abline(v = v, col = col.line.v, lty = lty.v, lwd = lwd.v)
+		}else{
+		  panel.abline(v = v[panel.number()], col = col.line.v, lty = lty.v, lwd = lwd.v) 
+		}
 		if (!is.null(se)) {
 			se <- as.numeric(se[subscripts])
 			panel.segments(transf(x - 1.96 * se), y, transf(x + 
 									1.96 * se), y, col = "black")
 		}
-		panel.xyplot(transf(x), y, pch = pch, col = col, cex = cex, ...)
+		panel.xyplot(transf(x), y, pch = pch, col = col, ...)
 	}
 	f <- function(nx, ...){
 		ss <- lme4:::asDf0(x, nx)
