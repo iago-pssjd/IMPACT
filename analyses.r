@@ -19,16 +19,16 @@ options(max.print=99999)
 
 # Libraries ---------------------------------------------------------------
 
-library(openxlsx)
-library(optimx)
-# library(lattice)
-library(ggplot2)
-library(matrixStats)
-library(haven)
+library(openxlsx) # createWorkbook
+# library(optimx)
+library(lattice) # dotplot
+# library(ggplot2)
+library(matrixStats) # rowMins
+library(haven) # read_sav
 # library(nlme)
-library(lme4)
+library(lme4) # lmer
 library(data.table)
-library(gimme)
+# library(gimme)
 
 
 # Auxiliar functions ------------------------------------------------------
