@@ -104,6 +104,9 @@ processes <- setdiff(EMA, outcomes)
 # remove 30 participants exhibiting no variability on at least one EMA item
 impactdtres <- impactdt[!ParticipantID %in% impactdt[, lapply(.SD, \(.x) uniqueN(.x) - any(is.na(.x))), by = ParticipantID, .SDcols = EMA][, min_var := rowMins(as.matrix(.SD)), .SDcols = !c('ParticipantID')][min_var <= 1]$ParticipantID]
 
+# impactdtres[, uniqueN(ParticipantID), by = Arm]
+
+
 beta10 <- beta90 <- beta <- chisq <- pchisq <- matrix(nrow = length(processes), ncol = length(outcomes))
 rownames(beta10) <- rownames(beta90) <- rownames(beta) <- rownames(chisq) <- rownames(pchisq) <- processes
 colnames(beta10) <- colnames(beta90) <- colnames(beta) <- colnames(chisq) <- colnames(pchisq) <- outcomes
@@ -129,11 +132,16 @@ for(ixout in seq_along(outcomes)){
 		}
 	}
 }
+
+# saving matrices
 sheet_list <- list("chi-square" = chisq, "chi-square p-value" = pchisq, "beta" = beta, "beta10" = beta10, "beta90" = beta90)
 for(sheetname in names(sheet_list)){
   addWorksheet(wb, sheetName = sheetname)
   writeData(wb, sheet = sheetname, sheet_list[[sheetname]], rowNames = TRUE)
 }
+
+
+## Multilevel analyses per arm ---------------------------------------------
 
 
 for(arm in levels(impactdtres$Arm)){
@@ -161,6 +169,8 @@ for(arm in levels(impactdtres$Arm)){
       }
     }
   }
+  
+  # saving matrices
   sheet_list <- list("chi-square" = chisq, "chi-square p-value" = pchisq, "beta" = beta, "beta10" = beta10, "beta90" = beta90)
   names(sheet_list) <- paste(names(sheet_list), sarm, sep = "-")
   for(sheetname in names(sheet_list)){
@@ -168,6 +178,11 @@ for(arm in levels(impactdtres$Arm)){
     writeData(wb, sheet = sheetname, sheet_list[[sheetname]], rowNames = TRUE)
   }
 }
+
+
+
+# Save --------------------------------------------------------------------
+
 
 saveWorkbook(wb, paste0(data_path, "multilevel-models.xlsx"), overwrite = TRUE)
 
