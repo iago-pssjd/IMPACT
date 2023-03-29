@@ -20,6 +20,7 @@ options(max.print=99999)
 # Libraries ---------------------------------------------------------------
 
 library(openxlsx) # createWorkbook
+library(psych)
 library(lattice) # dotplot
 library(matrixStats) # rowMins
 library(haven) # read_sav
@@ -87,6 +88,7 @@ impactdt <- read_sav(paste0(data_path, "Dataset_IMPACT-EMA_v2.sav"))
 impactdt <- as_factor(impactdt)
 setDT(impactdt)
 wb <- createWorkbook()
+wbcwb <- createWorkbook()
 
 
 # Global variables --------------------------------------------------------
@@ -181,8 +183,43 @@ for(arm in levels(impactdtres$Arm)){
 
 
 
+# Correlation within-between ----------------------------------------------
+
+cwbEMA <- statsBy(impactdtres[, .SD, .SDcols = c("ParticipantID", EMA)], group = "ParticipantID")
+
+# saving matrices
+sheet_list <- list("Pooled within correlation" = cwbEMA$rwg, "Within correlation probability" = cwbEMA$pwg, "Sample size weighted between" = cwbEMA$rbg, "Between correlation probability" = cwbEMA$pbg)
+for(sheetname in names(sheet_list)){
+  addWorksheet(wbcwb, sheetName = sheetname)
+  writeData(wbcwb, sheet = sheetname, sheet_list[[sheetname]], rowNames = TRUE)
+}
+
+
+## Correlation within-between per arm ---------------------------------------------
+
+
+for(arm in levels(impactdtres$Arm)){
+  cwbEMA <- statsBy(impactdtres[Arm == arm, .SD, .SDcols = c("ParticipantID", EMA)], group = "ParticipantID", cors = TRUE)
+  sarm <- sub("\\+", "", arm, "/")
+
+  # saving matrices
+  sheet_list <- list("Within correlation" = cwbEMA$rwg, "Within probability" = cwbEMA$pwg, "SSW between correlation" = cwbEMA$rbg, "Between probability" = cwbEMA$pbg)
+
+  names(sheet_list) <- paste(names(sheet_list), sarm, sep = "-")
+
+  for(sheetname in names(sheet_list)){
+    addWorksheet(wbcwb, sheetName = sheetname)
+    writeData(wbcwb, sheet = sheetname, sheet_list[[sheetname]], rowNames = TRUE)
+  }
+  
+}
+
+
+
+
 # Save --------------------------------------------------------------------
 
 
 saveWorkbook(wb, paste0(data_path, "multilevel-models.xlsx"), overwrite = TRUE)
+saveWorkbook(wbcwb, paste0(data_path, "correlations-within-between.xlsx"), overwrite = TRUE)
 
