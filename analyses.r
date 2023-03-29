@@ -60,9 +60,9 @@ dotplot.ranef.mer <- function(x, data, main = TRUE, transf = I, ...){
 		sup.symbol <- trellis.par.get("superpose.symbol")
 		panel.abline(h = levels.fos, col = col.line.h, lty = lty.h, lwd = lwd.h)
 		if(length(v) == 1){
-		  panel.abline(v = v, col = col.line.v, lty = lty.v, lwd = lwd.v)
+			panel.abline(v = v, col = col.line.v, lty = lty.v, lwd = lwd.v)
 		}else{
-		  panel.abline(v = v[panel.number()], col = col.line.v, lty = lty.v, lwd = lwd.v) 
+			panel.abline(v = v[panel.number()], col = col.line.v, lty = lty.v, lwd = lwd.v) 
 		}
 		if (!is.null(se)) {
 			se <- as.numeric(se[subscripts])
@@ -128,9 +128,9 @@ for(ixout in seq_along(outcomes)){
 		beta10[ixproc, ixout] <- quantile(coef(rsmodel)[["ParticipantID"]][[iproc]], probs = c(0.1))
 		beta90[ixproc, ixout] <- quantile(coef(rsmodel)[["ParticipantID"]][[iproc]], probs = c(0.9))
 		if(Sys.info()["sysname"] == "Windows"){
-		  png(paste0(data_path, "graphics/", iout, "-", iproc, ".png"), bg = "transparent")
-		  print(dotplot(rsmodel, col = 'darkgreen', col.line.v = 'purple', lty.v = 3, scales = list(y = list(draw = FALSE)), par.settings = list(strip.border = list(alpha = 0)), strip = strip.custom(factor.levels = c("Intercept (Z score)", "Slope (beta)"), bg = "transparent"))[["ParticipantID"]])
-		  dev.off()
+			png(paste0(data_path, "graphics/", iout, "-", iproc, ".png"), bg = "transparent")
+			print(dotplot(rsmodel, col = 'darkgreen', col.line.v = 'purple', lty.v = 3, scales = list(y = list(draw = FALSE)), par.settings = list(strip.border = list(alpha = 0)), strip = strip.custom(factor.levels = c("Intercept (Z score)", "Slope (beta)"), bg = "transparent"))[["ParticipantID"]])
+			dev.off()
 		}
 	}
 }
@@ -138,8 +138,8 @@ for(ixout in seq_along(outcomes)){
 # saving matrices
 sheet_list <- list("chi-square" = chisq, "chi-square p-value" = pchisq, "beta" = beta, "beta10" = beta10, "beta90" = beta90)
 for(sheetname in names(sheet_list)){
-  addWorksheet(wb, sheetName = sheetname)
-  writeData(wb, sheet = sheetname, sheet_list[[sheetname]], rowNames = TRUE)
+	addWorksheet(wb, sheetName = sheetname)
+	writeData(wb, sheet = sheetname, sheet_list[[sheetname]], rowNames = TRUE)
 }
 
 
@@ -147,38 +147,38 @@ for(sheetname in names(sheet_list)){
 
 
 for(arm in levels(impactdtres$Arm)){
-  beta10 <- beta90 <- beta <- chisq <- pchisq <- matrix(nrow = length(processes), ncol = length(outcomes))
-  rownames(beta10) <- rownames(beta90) <- rownames(beta) <- rownames(chisq) <- rownames(pchisq) <- processes
-  colnames(beta10) <- colnames(beta90) <- colnames(beta) <- colnames(chisq) <- colnames(pchisq) <- outcomes
-  sarm <- sub("\\+", "", arm, "/")
-  dir.create(paste0(data_path, "graphics/", sarm))
+	beta10 <- beta90 <- beta <- chisq <- pchisq <- matrix(nrow = length(processes), ncol = length(outcomes))
+	rownames(beta10) <- rownames(beta90) <- rownames(beta) <- rownames(chisq) <- rownames(pchisq) <- processes
+	colnames(beta10) <- colnames(beta90) <- colnames(beta) <- colnames(chisq) <- colnames(pchisq) <- outcomes
+	sarm <- sub("\\+", "", arm, "/")
+	dir.create(paste0(data_path, "graphics/", sarm))
 
-  for(ixout in seq_along(outcomes)){
-    for(ixproc in seq_along(processes)){
-      iout <- outcomes[ixout]
-      iproc <- processes[ixproc]
-      rimodel <- lmer(paste0(iout, " ~ ", iproc, " + (1|ParticipantID)"), data = impactdtres, REML = FALSE, control = lmerControl(optimizer = "bobyqa"), subset = Arm == arm)      # print(summary(rimodel))
-      rsmodel <- lmer(paste0(iout, " ~ ", iproc, " + (", iproc,"|ParticipantID)"), data = impactdtres, REML = FALSE, control = lmerControl(optimizer = "bobyqa"), subset = Arm == arm)
-      chisq[ixproc, ixout] <- anova(rsmodel, rimodel)[["Chisq"]][2]
-      pchisq[ixproc, ixout] <- anova(rsmodel, rimodel)[["Pr(>Chisq)"]][2]
-      beta[ixproc, ixout] <- fixef(rsmodel)[[iproc]]
-      beta10[ixproc, ixout] <- quantile(coef(rsmodel)[["ParticipantID"]][[iproc]], probs = c(0.1))
-      beta90[ixproc, ixout] <- quantile(coef(rsmodel)[["ParticipantID"]][[iproc]], probs = c(0.9))
-      if(Sys.info()["sysname"] == "Windows"){
-        png(paste0(data_path, "graphics/", sarm, "/", iout, "-", iproc, ".png"), bg = "transparent")
-        print(dotplot(rsmodel, col = 'darkgreen', col.line.v = 'purple', lty.v = 3, scales = list(y = list(draw = FALSE)), par.settings = list(strip.border = list(alpha = 0)), strip = strip.custom(factor.levels = c("Intercept (Z score)", "Slope (beta)"), bg = "transparent"))[["ParticipantID"]])
-        dev.off()
-      }
-    }
-  }
-  
-  # saving matrices
-  sheet_list <- list("chi-square" = chisq, "chi-square p-value" = pchisq, "beta" = beta, "beta10" = beta10, "beta90" = beta90)
-  names(sheet_list) <- paste(names(sheet_list), sarm, sep = "-")
-  for(sheetname in names(sheet_list)){
-    addWorksheet(wb, sheetName = sheetname)
-    writeData(wb, sheet = sheetname, sheet_list[[sheetname]], rowNames = TRUE)
-  }
+	for(ixout in seq_along(outcomes)){
+		for(ixproc in seq_along(processes)){
+			iout <- outcomes[ixout]
+			iproc <- processes[ixproc]
+			rimodel <- lmer(paste0(iout, " ~ ", iproc, " + (1|ParticipantID)"), data = impactdtres, REML = FALSE, control = lmerControl(optimizer = "bobyqa"), subset = Arm == arm)      # print(summary(rimodel))
+			rsmodel <- lmer(paste0(iout, " ~ ", iproc, " + (", iproc,"|ParticipantID)"), data = impactdtres, REML = FALSE, control = lmerControl(optimizer = "bobyqa"), subset = Arm == arm)
+			chisq[ixproc, ixout] <- anova(rsmodel, rimodel)[["Chisq"]][2]
+			pchisq[ixproc, ixout] <- anova(rsmodel, rimodel)[["Pr(>Chisq)"]][2]
+			beta[ixproc, ixout] <- fixef(rsmodel)[[iproc]]
+			beta10[ixproc, ixout] <- quantile(coef(rsmodel)[["ParticipantID"]][[iproc]], probs = c(0.1))
+			beta90[ixproc, ixout] <- quantile(coef(rsmodel)[["ParticipantID"]][[iproc]], probs = c(0.9))
+			if(Sys.info()["sysname"] == "Windows"){
+				png(paste0(data_path, "graphics/", sarm, "/", iout, "-", iproc, ".png"), bg = "transparent")
+				print(dotplot(rsmodel, col = 'darkgreen', col.line.v = 'purple', lty.v = 3, scales = list(y = list(draw = FALSE)), par.settings = list(strip.border = list(alpha = 0)), strip = strip.custom(factor.levels = c("Intercept (Z score)", "Slope (beta)"), bg = "transparent"))[["ParticipantID"]])
+				dev.off()
+			}
+		}
+	}
+
+	# saving matrices
+	sheet_list <- list("chi-square" = chisq, "chi-square p-value" = pchisq, "beta" = beta, "beta10" = beta10, "beta90" = beta90)
+	names(sheet_list) <- paste(names(sheet_list), sarm, sep = "-")
+	for(sheetname in names(sheet_list)){
+		addWorksheet(wb, sheetName = sheetname)
+		writeData(wb, sheet = sheetname, sheet_list[[sheetname]], rowNames = TRUE)
+	}
 }
 
 
@@ -190,8 +190,8 @@ cwbEMA <- statsBy(impactdtres[, .SD, .SDcols = c("ParticipantID", EMA)], group =
 # saving matrices
 sheet_list <- list("Pooled within correlation" = cwbEMA$rwg, "Within correlation probability" = cwbEMA$pwg, "Sample size weighted between" = cwbEMA$rbg, "Between correlation probability" = cwbEMA$pbg)
 for(sheetname in names(sheet_list)){
-  addWorksheet(wbcwb, sheetName = sheetname)
-  writeData(wbcwb, sheet = sheetname, sheet_list[[sheetname]], rowNames = TRUE)
+	addWorksheet(wbcwb, sheetName = sheetname)
+	writeData(wbcwb, sheet = sheetname, sheet_list[[sheetname]], rowNames = TRUE)
 }
 
 
@@ -199,19 +199,19 @@ for(sheetname in names(sheet_list)){
 
 
 for(arm in levels(impactdtres$Arm)){
-  cwbEMA <- statsBy(impactdtres[Arm == arm, .SD, .SDcols = c("ParticipantID", EMA)], group = "ParticipantID", cors = TRUE)
-  sarm <- sub("\\+", "", arm, "/")
+	cwbEMA <- statsBy(impactdtres[Arm == arm, .SD, .SDcols = c("ParticipantID", EMA)], group = "ParticipantID", cors = TRUE)
+	sarm <- sub("\\+", "", arm, "/")
 
-  # saving matrices
-  sheet_list <- list("Within correlation" = cwbEMA$rwg, "Within probability" = cwbEMA$pwg, "SSW between correlation" = cwbEMA$rbg, "Between probability" = cwbEMA$pbg)
+	# saving matrices
+	sheet_list <- list("Within correlation" = cwbEMA$rwg, "Within probability" = cwbEMA$pwg, "SSW between correlation" = cwbEMA$rbg, "Between probability" = cwbEMA$pbg)
 
-  names(sheet_list) <- paste(names(sheet_list), sarm, sep = "-")
+	names(sheet_list) <- paste(names(sheet_list), sarm, sep = "-")
 
-  for(sheetname in names(sheet_list)){
-    addWorksheet(wbcwb, sheetName = sheetname)
-    writeData(wbcwb, sheet = sheetname, sheet_list[[sheetname]], rowNames = TRUE)
-  }
-  
+	for(sheetname in names(sheet_list)){
+		addWorksheet(wbcwb, sheetName = sheetname)
+		writeData(wbcwb, sheet = sheetname, sheet_list[[sheetname]], rowNames = TRUE)
+	}
+
 }
 
 
