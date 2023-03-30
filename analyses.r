@@ -24,7 +24,6 @@ library(psych)
 library(lattice) # dotplot
 library(matrixStats) # rowMins
 library(haven) # read_sav
-library(lme4) # lmer
 library(data.table)
 # library(gimme)
 
@@ -185,10 +184,10 @@ for(arm in levels(impactdtres$Arm)){
 
 # Correlation within-between ----------------------------------------------
 
-cwbEMA <- statsBy(impactdtres[, .SD, .SDcols = c("ParticipantID", EMA)], group = "ParticipantID")
+cwbEMA <- statsBy(impactdtres[, .SD, .SDcols = c("ParticipantID", EMA)], group = "ParticipantID", cors = FALSE)
 
 # saving matrices
-sheet_list <- list("Pooled within correlation" = cwbEMA$rwg, "Within correlation probability" = cwbEMA$pwg, "Sample size weighted between" = cwbEMA$rbg, "Between correlation probability" = cwbEMA$pbg)
+sheet_list <- list("Within correlations" = cwbEMA$rwg[paste0(processes, ".wg"), paste0(outcomes, ".wg")], "Within correlation p-values" = cwbEMA$pwg[paste0(processes, ".wg"), paste0(outcomes, ".wg")], "Between correlations" = cwbEMA$rbg[paste0(processes, ".bg"), paste0(outcomes, ".bg")], "Between correlation p-values" = cwbEMA$pbg[paste0(processes, ".bg"), paste0(outcomes, ".bg")])
 for(sheetname in names(sheet_list)){
 	addWorksheet(wbcwb, sheetName = sheetname)
 	writeData(wbcwb, sheet = sheetname, sheet_list[[sheetname]], rowNames = TRUE)
@@ -199,11 +198,11 @@ for(sheetname in names(sheet_list)){
 
 
 for(arm in levels(impactdtres$Arm)){
-	cwbEMA <- statsBy(impactdtres[Arm == arm, .SD, .SDcols = c("ParticipantID", EMA)], group = "ParticipantID", cors = TRUE)
+	cwbEMA <- statsBy(impactdtres[Arm == arm, .SD, .SDcols = c("ParticipantID", EMA)], group = "ParticipantID")
 	sarm <- sub("\\+", "", arm, "/")
 
 	# saving matrices
-	sheet_list <- list("Within correlation" = cwbEMA$rwg, "Within probability" = cwbEMA$pwg, "SSW between correlation" = cwbEMA$rbg, "Between probability" = cwbEMA$pbg)
+	sheet_list <- list("Within correlations" = cwbEMA$rwg[paste0(processes, ".wg"), paste0(outcomes, ".wg")], "Within p-values" = cwbEMA$pwg[paste0(processes, ".wg"), paste0(outcomes, ".wg")], "Between correlations" = cwbEMA$rbg[paste0(processes, ".bg"), paste0(outcomes, ".bg")], "Between p-values" = cwbEMA$pbg[paste0(processes, ".bg"), paste0(outcomes, ".bg")])
 
 	names(sheet_list) <- paste(names(sheet_list), sarm, sep = "-")
 
