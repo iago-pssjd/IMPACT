@@ -187,7 +187,7 @@ for(arm in levels(impactdtres$Arm)){
 cwbEMA <- statsBy(impactdtres[, .SD, .SDcols = c("ParticipantID", EMA)], group = "ParticipantID", cors = FALSE)
 
 # saving matrices
-sheet_list <- list("Within correlations" = cwbEMA$rwg[paste0(processes, ".wg"), paste0(outcomes, ".wg")], "Within correlation p-values" = cwbEMA$pwg[paste0(processes, ".wg"), paste0(outcomes, ".wg")], "Between correlations" = cwbEMA$rbg[paste0(processes, ".bg"), paste0(outcomes, ".bg")], "Between correlation p-values" = cwbEMA$pbg[paste0(processes, ".bg"), paste0(outcomes, ".bg")])
+sheet_list <- list("Within correlations" = cwbEMA$rwg, "Within correlation p-values" = cwbEMA$pwg, "Between correlations" = cwbEMA$rbg, "Between correlation p-values" = cwbEMA$pbg)
 for(sheetname in names(sheet_list)){
 	addWorksheet(wbcwb, sheetName = sheetname)
 	writeData(wbcwb, sheet = sheetname, sheet_list[[sheetname]], rowNames = TRUE)
@@ -202,7 +202,7 @@ for(arm in levels(impactdtres$Arm)){
 	sarm <- sub("\\+", "", arm, "/")
 
 	# saving matrices
-	sheet_list <- list("Within correlations" = cwbEMA$rwg[paste0(processes, ".wg"), paste0(outcomes, ".wg")], "Within p-values" = cwbEMA$pwg[paste0(processes, ".wg"), paste0(outcomes, ".wg")], "Between correlations" = cwbEMA$rbg[paste0(processes, ".bg"), paste0(outcomes, ".bg")], "Between p-values" = cwbEMA$pbg[paste0(processes, ".bg"), paste0(outcomes, ".bg")])
+	sheet_list <- list("Within correlations" = cwbEMA$rwg, "Within p-values" = cwbEMA$pwg, "Between correlations" = cwbEMA$rbg, "Between p-values" = cwbEMA$pbg)
 
 	names(sheet_list) <- paste(names(sheet_list), sarm, sep = "-")
 
