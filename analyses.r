@@ -17,7 +17,7 @@ if(Sys.info()["sysname"] == "Linux"){
 
 options(max.print=99999)
 
-# Libraries ---------------------------------------------------------------
+#R! Libraries
 
 library(openxlsx) # createWorkbook
 library(psych)
@@ -28,7 +28,7 @@ library(data.table)
 # library(gimme)
 
 
-# Auxiliar functions ------------------------------------------------------
+#R! Auxiliar functions
 
 dotplot.lmerMod <- function(x, data, main = TRUE, transf = I, ...){
 	xf <- fixef(x)
@@ -81,7 +81,7 @@ dotplot.ranef.mer <- function(x, data, main = TRUE, transf = I, ...){
 }
 
 
-# Data loading --------------------------------------------------------------
+#R! Data loading
 
 impactdt <- read_sav(paste0(data_path, "Dataset_IMPACT-EMA_v2.sav"))
 impactdt <- as_factor(impactdt)
@@ -90,7 +90,7 @@ wb <- createWorkbook()
 wbcwb <- createWorkbook()
 
 
-# Global variables --------------------------------------------------------
+#R! Global variables
 
 EMA <- names(impactdt[, .SD, .SDcols = PainIntensity:Inaction])
 pOUTCOMES <- c("InterferLeasure", "InterferSocial", "InterferWork")
@@ -100,7 +100,7 @@ processes <- setdiff(EMA, outcomes)
 
 
 
-# Data arranging ----------------------------------------------
+#R! Data arranging
 
 # remove 30 participants exhibiting no variability on at least one EMA item
 impactdtres <- impactdt[!ParticipantID %in% impactdt[, lapply(.SD, \(.x) uniqueN(.x) - any(is.na(.x))), by = ParticipantID, .SDcols = EMA][, min_var := rowMins(as.matrix(.SD)), .SDcols = !c('ParticipantID')][min_var <= 1]$ParticipantID]
@@ -112,7 +112,7 @@ beta10 <- beta90 <- beta <- chisq <- pchisq <- matrix(nrow = length(processes), 
 rownames(beta10) <- rownames(beta90) <- rownames(beta) <- rownames(chisq) <- rownames(pchisq) <- processes
 colnames(beta10) <- colnames(beta90) <- colnames(beta) <- colnames(chisq) <- colnames(pchisq) <- outcomes
 
-# Multilevel analyses -----------------------------------------------------
+#R! Multilevel analyses
 
 
 for(ixout in seq_along(outcomes)){
@@ -142,7 +142,7 @@ for(sheetname in names(sheet_list)){
 }
 
 
-## Multilevel analyses per arm ---------------------------------------------
+#R!! Multilevel analyses per arm
 
 
 for(arm in levels(impactdtres$Arm)){
@@ -182,7 +182,7 @@ for(arm in levels(impactdtres$Arm)){
 
 
 
-# Correlation within-between ----------------------------------------------
+#R! Correlation within-between
 
 cwbEMA <- statsBy(impactdtres[, .SD, .SDcols = c("ParticipantID", EMA)], group = "ParticipantID", cors = FALSE)
 
@@ -194,7 +194,7 @@ for(sheetname in names(sheet_list)){
 }
 
 
-## Correlation within-between per arm ---------------------------------------------
+#R!! Correlation within-between per arm
 
 
 for(arm in levels(impactdtres$Arm)){
@@ -216,7 +216,7 @@ for(arm in levels(impactdtres$Arm)){
 
 
 
-# Save --------------------------------------------------------------------
+#R! Save
 
 
 saveWorkbook(wb, paste0(data_path, "multilevel-models.xlsx"), overwrite = TRUE)
