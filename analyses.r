@@ -19,7 +19,9 @@ options(max.print=99999)
 
 #R! Libraries
 
+
 library(openxlsx) # createWorkbook
+library(forecast)
 library(psych)
 library(lattice) # dotplot
 library(matrixStats) # rowMins
@@ -93,8 +95,8 @@ setDT(impactdt)
 #R! Global variables
 
 EMA <- names(impactdt[, .SD, .SDcols = PainIntensity:Inaction])
-pOUTCOMES <- c("InterferLeasure", "InterferSocial", "InterferWork")
-sOUTCOMES <- c("Sadness", "PainIntensity", "PainControl", "SleepDisturb", "Stress")
+pOUTCOMES <- c("InterferLeasure", "InterferSocial", "InterferWork") # primary outcomes
+sOUTCOMES <- c("Sadness", "PainIntensity", "PainControl", "SleepDisturb", "Stress") # secondary outcomes
 outcomes <- c(pOUTCOMES, sOUTCOMES)
 processes <- setdiff(EMA, outcomes)
 
@@ -215,7 +217,7 @@ for(arm in levels(impactdtres$Arm)){
 
 }
 
-
+#R! ARIMAX models
 
 
 #R! Save
