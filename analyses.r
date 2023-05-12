@@ -218,6 +218,14 @@ for(arm in levels(impactdtres$Arm)){
 }
 
 #R! ARIMAX models
+impactIDs <- unique(impactdtres$ParticipantID)
+ixid <- 1
+ixout <- 1
+ixproc <- 1
+iD <- impactIDs[ixid]
+iout <- outcomes[ixout]
+iproc <- processes[ixproc]
+impactdtres[ParticipantID == iD, c(.(ParticipantID = ParticipantID), .SD), .SDcols = c(iout, iproc)]
 
 
 #R! Save
