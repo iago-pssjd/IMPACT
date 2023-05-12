@@ -86,8 +86,8 @@ dotplot.ranef.mer <- function(x, data, main = TRUE, transf = I, ...){
 impactdt <- read_sav(paste0(data_path, "Dataset_IMPACT-EMA_v2.sav"))
 impactdt <- as_factor(impactdt)
 setDT(impactdt)
-wb <- createWorkbook()
-wbcwb <- createWorkbook()
+# wb <- createWorkbook()
+# wbcwb <- createWorkbook()
 
 
 #R! Global variables
@@ -108,11 +108,13 @@ impactdtres <- impactdt[!ParticipantID %in% impactdt[, lapply(.SD, \(.x) uniqueN
 # impactdtres[, uniqueN(ParticipantID), by = Arm]
 
 
+#R! Multilevel analyses
+
+
 beta10 <- beta90 <- beta <- chisq <- pchisq <- matrix(nrow = length(processes), ncol = length(outcomes))
 rownames(beta10) <- rownames(beta90) <- rownames(beta) <- rownames(chisq) <- rownames(pchisq) <- processes
 colnames(beta10) <- colnames(beta90) <- colnames(beta) <- colnames(chisq) <- colnames(pchisq) <- outcomes
 
-#R! Multilevel analyses
 
 
 for(ixout in seq_along(outcomes)){
