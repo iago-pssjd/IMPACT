@@ -1,4 +1,7 @@
 
+#R! Preliminaries
+
+#R!! OS dependencies
 
 if(Sys.info()["sysname"] == "Linux"){
 	data_path <- paste0("/media/", 
@@ -17,7 +20,7 @@ if(Sys.info()["sysname"] == "Linux"){
 
 options(max.print=99999)
 
-#R! Libraries
+#R!! Libraries
 
 
 library(openxlsx) # createWorkbook
@@ -30,7 +33,7 @@ library(data.table)
 # library(gimme)
 
 
-#R! Auxiliar functions
+#R!! Auxiliar functions
 
 dotplot.lmerMod <- function(x, data, main = TRUE, transf = I, ...){
 	xf <- fixef(x)
@@ -83,7 +86,7 @@ dotplot.ranef.mer <- function(x, data, main = TRUE, transf = I, ...){
 }
 
 
-#R! Data loading
+#R!! Data loading
 
 impactdt <- read_sav(paste0(data_path, "Dataset_IMPACT-EMA_v2.sav"))
 impactdt <- as_factor(impactdt)
@@ -92,7 +95,7 @@ setDT(impactdt)
 # wbcwb <- createWorkbook()
 
 
-#R! Global variables
+#R!! Global variables
 
 EMA <- names(impactdt[, .SD, .SDcols = PainIntensity:Inaction])
 pOUTCOMES <- c("InterferLeasure", "InterferSocial", "InterferWork") # primary outcomes
@@ -102,7 +105,7 @@ processes <- setdiff(EMA, outcomes)
 
 
 
-#R! Data arranging
+#R!! Data arranging
 
 # remove 30 participants exhibiting no variability on at least one EMA item
 impactdtres <- impactdt[!ParticipantID %in% impactdt[, lapply(.SD, \(.x) uniqueN(.x) - any(is.na(.x))), by = ParticipantID, .SDcols = EMA][, min_var := rowMins(as.matrix(.SD)), .SDcols = !c('ParticipantID')][min_var <= 1]$ParticipantID]
@@ -225,7 +228,8 @@ ixproc <- 1
 iD <- impactIDs[ixid]
 iout <- outcomes[ixout]
 iproc <- processes[ixproc]
-impactdtres[ParticipantID == iD, c(.(ParticipantID = ParticipantID), .SD), .SDcols = c(iout, iproc)]
+iDdt <- na.omit(impactdtres[ParticipantID == iD, c(.(ParticipantID = ParticipantID), .SD), .SDcols = c(iout, iproc)])
+# iDfit <- auto.arima(..., xreg = as.matrix(iDdt[, iproc, with = FALSE]))
 
 
 #R! Save
