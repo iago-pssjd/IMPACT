@@ -24,6 +24,7 @@ options(max.print=99999)
 
 
 library(openxlsx) # createWorkbook
+library(metafor)
 library(forecast)
 library(psych)
 library(lattice) # dotplot
@@ -93,6 +94,8 @@ impactdt <- as_factor(impactdt)
 setDT(impactdt)
 # wb <- createWorkbook()
 # wbcwb <- createWorkbook()
+wbT1 <- wbmeta <- createWorkbook()
+
 
 
 #R!! Global variables
@@ -115,6 +118,7 @@ impactdtres <- impactdt[!ParticipantID %in% impactdt[, lapply(.SD, \(.x) uniqueN
 
 #R! Multilevel analyses
 
+#R!! Global analyses
 
 beta10 <- beta90 <- beta <- chisq <- pchisq <- matrix(nrow = length(processes), ncol = length(outcomes))
 rownames(beta10) <- rownames(beta90) <- rownames(beta) <- rownames(chisq) <- rownames(pchisq) <- processes
@@ -191,6 +195,8 @@ for(arm in levels(impactdtres$Arm)){
 
 #R! Correlation within-between
 
+#R!! Global correlations
+
 cwbEMA <- statsBy(impactdtres[, .SD, .SDcols = c("ParticipantID", EMA)], group = "ParticipantID", cors = FALSE)
 
 # saving matrices
@@ -221,15 +227,99 @@ for(arm in levels(impactdtres$Arm)){
 }
 
 #R! ARIMAX models
-impactIDs <- unique(impactdtres$ParticipantID)
-ixid <- 1
-ixout <- 1
-ixproc <- 1
-iD <- impactIDs[ixid]
-iout <- outcomes[ixout]
-iproc <- processes[ixproc]
-iDdt <- na.omit(impactdtres[ParticipantID == iD, c(.(ParticipantID = ParticipantID), .SD), .SDcols = c(iout, iproc)])
-# iDfit <- auto.arima(..., xreg = as.matrix(iDdt[, iproc, with = FALSE]))
+impactIDs <- unique(impactdtres[, .(ParticipantID, Arm)])
+
+#R!! Global models
+
+
+#R!!! Only outcome models (Table 1)
+
+T1 <- matrix(nrow = 7*3, ncol = length(outcomes))
+rownames(T1) <- paste(rep(c("p", "d", "q", "s", "P", "D", "Q"), each = 3), ":", c("None", "One", "Over One"))
+colnames(T1) <- outcomes
+T1list <- list()
+
+for(ixout in seq_along(outcomes)){
+  # ixout <- 1
+  iout <- outcomes[ixout]
+    opDT <- impactdtres[, c(.(ParticipantID = ParticipantID, Time = Time, Time_Series = Time_Series), .SD), .SDcols = c(iout)]
+    iDout <- matrix(nrow = nrow(impactIDs), ncol = 7)
+    rownames(iDout) <- impactIDs[, ParticipantID]
+    colnames(iDout) <- c("p", "d", "q", "s", "P", "D", "Q")
+    for(ixid in seq_len(nrow(impactIDs))){
+      # ixid <- 1
+      iD <- impactIDs[ixid, ParticipantID]
+      iDdt <- opDT[ParticipantID == iD]
+      dt2ts <- ts(iDdt[, iout, with = FALSE])
+      iDfit <- auto.arima(dt2ts)
+      iDout[ixid, c("p", "d", "q", "s", "P", "D", "Q")] <- iDfit$arma[c(1, 6, 2, 5, 3, 7, 4)]
+      rm(dt2ts, iDfit)
+    }
+    iDout2 <- apply(iDout, 2, cut, breaks = c(-Inf, 0.5, 1.5, Inf), labels = c("None", "One", "Over One"))
+    for(rn in rownames(T1)){
+      T1[rn, iout] <- sum(iDout2[, sub("\\s:.*$", "", rn)] == sub("^.*:\\s", "", rn))/nrow(iDout2)
+    }
+    T1list[[iout]] <- as.data.table(iDout)[, ARorder := interaction(p, d, q, s, P, D, Q, drop = TRUE)]
+    rm(iDout, iDout2)
+    gc()
+}
+
+T11 <- rbindlist(T1list, idcol = "outcome")[, .N, by = ARorder][, p:= round(N * 100/sum(N), 2)][]
+addWorksheet(wbT1, sheetName = "ARIMA order frequencies")
+writeData(wbT1, sheet = "ARIMA order frequencies", round(T1*100, 2), rowNames = TRUE, colNames = TRUE)
+addWorksheet(wbT1, sheetName = "ARIMA pattern frequencies")
+writeData(wbT1, sheet = "ARIMA pattern frequencies", T11, rowNames = FALSE, colNames = TRUE)
+saveWorkbook(wbT1, paste0(data_path,"ArimaT1.xlsx"), overwrite = TRUE)
+
+#R!!! Outcome-process models
+
+pooledOut <- list()
+beta <- se <- i2 <- qe <- matrix(nrow = length(processes), ncol = length(outcomes))
+rownames(beta) <- rownames(se) <- rownames(i2) <- rownames(qe) <- processes
+colnames(beta) <- colnames(se) <- colnames(i2) <- colnames(qe) <- outcomes
+
+
+for(ixout in seq_along(outcomes)){
+  # ixout <- 1
+  iout <- outcomes[ixout]
+  for(ixproc in seq_along(processes)){
+    # ixproc <- 1
+    iproc <- processes[ixproc]
+    wbAR <- createWorkbook()
+    opDT <- impactdtres[, c(.(ParticipantID = ParticipantID, Time = Time, Time_Series = Time_Series), .SD), .SDcols = c(iout, iproc)]
+    iDout <- matrix(nrow = nrow(impactIDs), ncol = 9)
+    rownames(iDout) <- impactIDs[, ParticipantID]
+    colnames(iDout) <- c("beta", "SE", "p", "d", "q", "s", "P", "D", "Q")
+    for(ixid in seq_len(nrow(impactIDs))){
+      # ixid <- 1
+      iD <- impactIDs[ixid, ParticipantID]
+      iDdt <- opDT[ParticipantID == iD]
+      dt2ts <- ts(iDdt[, iout, with = FALSE])
+      dt2xreg <- as.matrix(iDdt[, iproc, with = FALSE])
+      iDfit <- auto.arima(dt2ts, xreg = dt2xreg)
+      iDout[ixid, "beta"] <- coef(iDfit)[[iproc]]
+      iDout[ixid, "SE"] <- sqrt(iDfit$var.coef[iproc, iproc])
+      iDout[ixid, c("p", "d", "q", "s", "P", "D", "Q")] <- iDfit$arma[c(1, 6, 2, 5, 3, 7, 4)]
+      rm(dt2ts, dt2xreg, iDfit)
+    }
+    pooledOut[[paste(iout, iproc, sep = "-")]] <- iDout
+    addWorksheet(wbAR, sheetName = "Individual ARIMA betas")
+    writeData(wbAR, sheet = "Individual ARIMA betas", iDout, rowNames = TRUE, colNames = TRUE)
+    saveWorkbook(wbAR, paste0(data_path, "ARIMAX/",iout,"-",iproc,".xlsx"), overwrite = TRUE)
+    res.nomod <- rma(yi = iDbeta, sei = iDse, measure = "GEN", method = "REML")
+    # res.mod <- rma(yi = iDbeta, sei = iDse, mods = impactIDs[, Arm], measure = "GEN", method = "REML")
+    beta[ixproc, ixout] <- res.nomod$beta[1]
+    se[ixproc, ixout] <- res.nomod$se
+    i2[ixproc, ixout] <- res.nomod$I2
+    qe[ixproc, ixout] <- res.nomod$QE
+
+    rm(wbAR, iDout)
+    gc()
+  }
+}
+
+
+# forest(res.nomod, slab = paste0(impactIDs[, ParticipantID], " (", impactIDs[, Arm], ")"))
 
 
 #R! Save
