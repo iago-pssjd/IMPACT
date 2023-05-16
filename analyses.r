@@ -297,7 +297,10 @@ for(ixout in seq_along(outcomes)){
       iDdt <- opDT[ParticipantID == iD]
       dt2ts <- ts(iDdt[, iout, with = FALSE])
       dt2xreg <- as.matrix(iDdt[, iproc, with = FALSE])
-      iDfit <- auto.arima(dt2ts, xreg = dt2xreg)
+      iDfit <- try(auto.arima(dt2ts, xreg = dt2xreg), silent = TRUE)
+      if(inherits(iDfit, "try-error")){
+        
+      }
       iDregression <- lm(reformulate(iproc, response = iout), data = iDdt)
       iDout[ixid, "beta"] <- coef(iDfit)[[iproc]]
       iDout[ixid, "SE"] <- sqrt(iDfit$var.coef[iproc, iproc])
@@ -334,7 +337,7 @@ for(ixout in seq_along(outcomes)){
   }
 }
 
-T2 <- rbindlist(pooledOut, idcol = "OPinteraction")[, c("outcome", "process") := tstrsplit(OPinteraction, split = "_", fixed = TRUE)][, .(reg_avg = mean(beta_reg), iARIMAX_avg = mean(beta), cor_reg_iARIMAX = cor(beta, beta_reg), reg_avg_SE = mean(SE_reg), iARIMAX_avg_SE = mean(SE)), by = outcome]
+T2 <- rbindlist(pooledOut, idcol = "OPinteraction")[, c("outcome", "process") := tstrsplit(OPinteraction, split = "_", fixed = TRUE)][, .(reg_avg = mean(beta_reg, na.rm = TRUE), iARIMAX_avg = mean(beta, na.rm = TRUE), cor_reg_iARIMAX = cor(beta, beta_reg, use = "complete.obs"), reg_avg_SE = mean(SE_reg, na.rm = TRUE), iARIMAX_avg_SE = mean(SE, na.rm = TRUE)), by = outcome]
 # forest(res.nomod, slab = paste0(impactIDs[, ParticipantID], " (", impactIDs[, Arm], ")"))
 
 
