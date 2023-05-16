@@ -265,18 +265,19 @@ for(ixout in seq_along(outcomes)){
 }
 
 T11 <- rbindlist(T1list, idcol = "outcome")[, .N, by = ARorder][, p:= round(N * 100/sum(N), 2)][]
-addWorksheet(wbT1, sheetName = "ARIMA order frequencies")
-writeData(wbT1, sheet = "ARIMA order frequencies", round(T1*100, 2), rowNames = TRUE, colNames = TRUE)
-addWorksheet(wbT1, sheetName = "ARIMA pattern frequencies")
-writeData(wbT1, sheet = "ARIMA pattern frequencies", T11, rowNames = FALSE, colNames = TRUE)
-saveWorkbook(wbT1, paste0(data_path,"ArimaT1.xlsx"), overwrite = TRUE)
+addWorksheet(wbT1, sheetName = "iARIMA order frequencies")
+writeData(wbT1, sheet = "iARIMA order frequencies", round(T1*100, 2), rowNames = TRUE, colNames = TRUE)
+addWorksheet(wbT1, sheetName = "iARIMA pattern frequencies")
+writeData(wbT1, sheet = "iARIMA pattern frequencies", T11, rowNames = FALSE, colNames = TRUE)
+saveWorkbook(wbT1, paste0(data_path,"iArimaT1.xlsx"), overwrite = TRUE)
 
 #R!!! Outcome-process models
 
+beta_bands <- c("(-Inf, -0.3)", "[-0.3, -0.2)", "[-0.2, -0.1)", "[-0.1, 0.1]", "(0.1, 0.2]", "(0.2, 0.3]", "(0.3, +Inf)")
 pooledOut <- list()
-beta <- se <- i2 <- qe <- matrix(nrow = length(processes), ncol = length(outcomes))
-rownames(beta) <- rownames(se) <- rownames(i2) <- rownames(qe) <- processes
-colnames(beta) <- colnames(se) <- colnames(i2) <- colnames(qe) <- outcomes
+mainOut <- matrix(nrow = length(processes) * length(outcomes), ncol = 4 + length(beta_bands))
+rownames(mainOut) <- paste(rep(outcomes, each = length(processes)), processes, sep = "-")
+colnames(mainOut) <- c("beta", "SE", "I2", "Q", beta_bands)
 
 
 for(ixout in seq_along(outcomes)){
@@ -287,9 +288,9 @@ for(ixout in seq_along(outcomes)){
     iproc <- processes[ixproc]
     wbAR <- createWorkbook()
     opDT <- impactdtres[, c(.(ParticipantID = ParticipantID, Time = Time, Time_Series = Time_Series), .SD), .SDcols = c(iout, iproc)]
-    iDout <- matrix(nrow = nrow(impactIDs), ncol = 9)
+    iDout <- matrix(nrow = nrow(impactIDs), ncol = 11)
     rownames(iDout) <- impactIDs[, ParticipantID]
-    colnames(iDout) <- c("beta", "SE", "p", "d", "q", "s", "P", "D", "Q")
+    colnames(iDout) <- c("beta", "SE", "p", "d", "q", "s", "P", "D", "Q", "beta_reg", "SE_reg")
     for(ixid in seq_len(nrow(impactIDs))){
       # ixid <- 1
       iD <- impactIDs[ixid, ParticipantID]
@@ -297,28 +298,43 @@ for(ixout in seq_along(outcomes)){
       dt2ts <- ts(iDdt[, iout, with = FALSE])
       dt2xreg <- as.matrix(iDdt[, iproc, with = FALSE])
       iDfit <- auto.arima(dt2ts, xreg = dt2xreg)
+      iDregression <- lm(reformulate(iproc, response = iout), data = iDdt)
       iDout[ixid, "beta"] <- coef(iDfit)[[iproc]]
       iDout[ixid, "SE"] <- sqrt(iDfit$var.coef[iproc, iproc])
       iDout[ixid, c("p", "d", "q", "s", "P", "D", "Q")] <- iDfit$arma[c(1, 6, 2, 5, 3, 7, 4)]
+      iDout[ixid, "beta_reg"] <- coef(iDregression)[[iproc]]
+      iDout[ixid, "SE_reg"] <- sqrt(vcov(iDregression)[iproc, iproc])
       rm(dt2ts, dt2xreg, iDfit)
     }
-    pooledOut[[paste(iout, iproc, sep = "-")]] <- iDout
-    addWorksheet(wbAR, sheetName = "Individual ARIMA betas")
-    writeData(wbAR, sheet = "Individual ARIMA betas", iDout, rowNames = TRUE, colNames = TRUE)
+    
+    # save matrix of individual models outputs
+    addWorksheet(wbAR, sheetName = "Individual models output")
+    writeData(wbAR, sheet = "Individual models output", iDout, rowNames = TRUE, colNames = TRUE)
     saveWorkbook(wbAR, paste0(data_path, "ARIMAX/",iout,"-",iproc,".xlsx"), overwrite = TRUE)
-    res.nomod <- rma(yi = iDbeta, sei = iDse, measure = "GEN", method = "REML")
-    # res.mod <- rma(yi = iDbeta, sei = iDse, mods = impactIDs[, Arm], measure = "GEN", method = "REML")
-    beta[ixproc, ixout] <- res.nomod$beta[1]
-    se[ixproc, ixout] <- res.nomod$se
-    i2[ixproc, ixout] <- res.nomod$I2
-    qe[ixproc, ixout] <- res.nomod$QE
+    
+    # meta-analysis for ARIMAX models
+    res.nomod <- rma(yi = iDout[,"beta"], sei = iDout[,"SE"], measure = "GEN", method = "REML")
+    
+    # meta-analysis for regression models
+    res.reg <- rma(yi = iDout[,"beta_reg"], sei = iDout[,"SE_reg"], measure = "GEN", method = "REML")
+    
+    # meta-analysis for ARIMAX models adjusted per study arm
+    # res.mod <- rma(yi = iDout[,"beta"], sei = iDout[,"SE"], mods = impactIDs[, Arm], measure = "GEN", method = "REML")
+    
+    mainOut[paste(iout, iproc, sep = "-"), "beta"] <- res.nomod$beta[1]
+    mainOut[paste(iout, iproc, sep = "-"), c("SE", "I2", "Q")] <- unlist(res.nomod[c("se", "I2", "QE")])
 
+    
+    iDout <- as.data.table(iDout)
+    pooledOut[[paste(iout, iproc, sep = "-")]] <- iDout
+    mainOut[paste(iout, iproc, sep = "-"), beta_bands] <- iDout[, betaq := factor(fcase(between(beta, -.1, .1, incbounds = TRUE), 0, between(beta, .1, .2, incbounds = TRUE), 1, between(beta, .2, .3, incbounds = TRUE), 2, beta > .3, 3, between(beta, -.2, -.1, incbounds = TRUE), -1, between(beta, -.3, -.2, incbounds = TRUE), -2, beta < -.3, -3), levels = seq(-3, 3, 1), labels = beta_bands)][, .N, keyby = betaq][, round(100 * N/sum(N), 2)]
+    
     rm(wbAR, iDout)
     gc()
   }
 }
 
-
+T2 <- rbindlist(pooledOut, idcol = "OPinteraction")[, c("outcome", "process") := tstrsplit(OPinteraction, split = "_", fixed = TRUE)][, .(reg_avg = mean(beta_reg), iARIMAX_avg = mean(beta), cor_reg_iARIMAX = cor(beta, beta_reg), reg_avg_SE = mean(SE_reg), iARIMAX_avg_SE = mean(SE)), by = outcome]
 # forest(res.nomod, slab = paste0(impactIDs[, ParticipantID], " (", impactIDs[, Arm], ")"))
 
 
