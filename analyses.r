@@ -327,7 +327,7 @@ for(ixout in seq_along(outcomes)){
     
     iDout <- as.data.table(iDout)
     pooledOut[[paste(iout, iproc, sep = "-")]] <- iDout
-    mainOut[paste(iout, iproc, sep = "-"), beta_bands] <- iDout[, betaq := factor(fcase(between(beta, -.1, .1, incbounds = TRUE), 0, between(beta, .1, .2, incbounds = TRUE), 1, between(beta, .2, .3, incbounds = TRUE), 2, beta > .3, 3, between(beta, -.2, -.1, incbounds = TRUE), -1, between(beta, -.3, -.2, incbounds = TRUE), -2, beta < -.3, -3), levels = seq(-3, 3, 1), labels = beta_bands)][, .N, keyby = betaq][, round(100 * N/sum(N), 2)]
+    mainOut[paste(iout, iproc, sep = "-"), beta_bands] <- iDout[, betaq := factor(fcase(between(beta, -.1, .1, incbounds = TRUE), 0, between(beta, .1, .2, incbounds = TRUE), 1, between(beta, .2, .3, incbounds = TRUE), 2, beta > .3, 3, between(beta, -.2, -.1, incbounds = TRUE), -1, between(beta, -.3, -.2, incbounds = TRUE), -2, beta < -.3, -3), levels = seq(-3, 3, 1), labels = beta_bands)][levels(betaq), on = "betaq", .N, by = .EACHI][, round(100 * N/sum(N), 2)]
     
     rm(wbAR, iDout)
     gc()
