@@ -230,19 +230,35 @@ for(arm in levels(impactdtres$Arm)){
 
 impactIDs <- unique(impactdtres[, .(ParticipantID, Arm)])
 ARIMA_parameters <- c("p", "d", "q", "s", "P", "D", "Q")
+beta_bands <- c("(-Inf, -0.3)", "[-0.3, -0.2)", "[-0.2, -0.1)", "[-0.1, 0.1]", "(0.1, 0.2]", "(0.2, 0.3]", "(0.3, +Inf)")
 
 
-
-
-#R!! Only outcome models (Table 1)
 
 T1 <- matrix(data = NA, nrow = length(ARIMA_parameters)*3, ncol = length(outcomes))
 rownames(T1) <- paste(rep(ARIMA_parameters, each = 3), ":", c("None", "One", "Over One"))
 colnames(T1) <- outcomes
-T1arm <- list(T1, T1, T1)
-sarm <- sub("\\+", "", levels(impactdtres$Arm))
-names(T1arm) <- sarm
 T1list <- list()
+
+mainOut <- matrix(data = NA, nrow = length(processes) * length(outcomes), ncol = 4 + length(beta_bands))
+rownames(mainOut) <- paste(rep(outcomes, each = length(processes)), processes, sep = "-")
+colnames(mainOut) <- c("beta", "SE", "I2", "Q", beta_bands)
+pooledOut <- list()
+
+
+sarm <- sub("\\+", "", levels(impactdtres$Arm))
+
+T1arm <- list(T1, T1, T1)
+names(T1arm) <- sarm
+T11arm <- vector(mode = "list", length = length(sarm))
+names(T11arm) <- sarm
+
+mainOutArm <- list(mainOut, mainOut, mainOut)
+names(mainOutArm) <- sarm
+T2arm <- vector(mode = "list", length = length(sarm))
+names(T2arm) <- sarm
+
+
+#R!! Only outcome models (Table 1)
 
 for(ixout in seq_along(outcomes)){
 	# ixout <- 1
@@ -264,13 +280,14 @@ for(ixout in seq_along(outcomes)){
 	for(rn in rownames(T1)){
 		T1[rn, iout] <- sum(iDout2[, sub("\\s:.*$", "", rn)] == sub("^.*:\\s", "", rn))/nrow(iDout2)
 	}
-	T1list[[iout]] <- as.data.table(iDout, keep.rownames = "ParticipantID")[, ARorder := interaction(p, d, q, s, P, D, Q, drop = TRUE)]
+	T1list[[iout]] <- as.data.table(iDout, keep.rownames = "ParticipantID")[, `:=` (ARorder = interaction(p, d, q, s, P, D, Q, drop = TRUE), 
+											Arm = impactIDs[, Arm])]
 
 	for(arm in levels(impactdtres$Arm)){
 		sarm <- sub("\\+", "", arm)
 		iDoutArm <- iDout[impactIDs[Arm == arm, ParticipantID],]
 		iDout2 <- apply(iDoutArm, 2, cut, breaks = c(-Inf, 0.5, 1.5, Inf), labels = c("None", "One", "Over One"))
-		for(rn in rownames(T1arm)){
+		for(rn in rownames(T1arm[[sarm]])){
 			T1arm[[sarm]][rn, iout] <- sum(iDout2[, sub("\\s:.*$", "", rn)] == sub("^.*:\\s", "", rn))/nrow(iDout2)
 		}
 	}
@@ -279,16 +296,15 @@ for(ixout in seq_along(outcomes)){
 	gc()
 }
 
-T11 <- rbindlist(T1list, idcol = "outcome")[, .N, by = ARorder][, p:= round(N * 100/sum(N), 2)][]
+T11 <- rbindlist(T1list, idcol = "outcome")[, .N, by = ARorder][, p := round(N * 100/sum(N), 2)][]
 
+for(arm in levels(impactdtres$Arm)){
+	sarm <- sub("\\+", "", arm)
+	T11arm[[sarm]] <- rbindlist(T1list, idcol = "outcome")[Arm == arm][, .N, by = ARorder][, p := round(N * 100/sum(N), 2)][]
+}
 
 #R!! Outcome-process models
 
-beta_bands <- c("(-Inf, -0.3)", "[-0.3, -0.2)", "[-0.2, -0.1)", "[-0.1, 0.1]", "(0.1, 0.2]", "(0.2, 0.3]", "(0.3, +Inf)")
-pooledOut <- list()
-mainOut <- matrix(data = NA, nrow = length(processes) * length(outcomes), ncol = 4 + length(beta_bands))
-rownames(mainOut) <- paste(rep(outcomes, each = length(processes)), processes, sep = "-")
-colnames(mainOut) <- c("beta", "SE", "I2", "Q", beta_bands)
 
 
 for(ixout in seq_along(outcomes)){
@@ -297,9 +313,8 @@ for(ixout in seq_along(outcomes)){
 	for(ixproc in seq_along(processes)){
 		# ixproc <- 3
 		iproc <- processes[ixproc]
-		# wbAR <- createWorkbook()
 		opDT <- impactdtres[, c(.(ParticipantID = ParticipantID, Time = Time, Time_Series = Time_Series), .SD), .SDcols = c(iout, iproc)]
-		iDout <- matrix(nrow = nrow(impactIDs), ncol = 11)
+		iDout <- matrix(data = NA, nrow = nrow(impactIDs), ncol = 4 + length(ARIMA_parameters))
 		rownames(iDout) <- impactIDs[, ParticipantID]
 		colnames(iDout) <- c("beta", "SE", ARIMA_parameters, "beta_reg", "SE_reg")
 		for(ixid in seq_len(nrow(impactIDs))){
@@ -320,25 +335,23 @@ for(ixout in seq_along(outcomes)){
 			rm(dt2ts, dt2xreg, iDfit)
 		}
 
-		# save matrix of individual models outputs
-		# addWorksheet(wbAR, sheetName = "Individual models output")
-		# writeData(wbAR, sheet = "Individual models output", iDout, rowNames = TRUE, colNames = TRUE)
-		# saveWorkbook(wbAR, paste0(data_path, "ARIMAX/",iout,"-",iproc,".xlsx"), overwrite = TRUE)
+		iDout <- as.data.table(iDout, keep.rownames = "ParticipantID")[, Arm := impactIDs[, Arm]]
+		pooledOut[[paste(iout, iproc, sep = "-")]] <- iDout
+
 
 		# meta-analysis for ARIMAX models
-		res.nomod <- rma(yi = iDout[,"beta"], sei = iDout[,"SE"], measure = "GEN", method = "REML")
+		res.nomod <- rma(yi = beta, sei = SE, data = iDout, measure = "GEN", method = "REML")
 
 		# meta-analysis for regression models
-		res.reg <- rma(yi = iDout[,"beta_reg"], sei = iDout[,"SE_reg"], measure = "GEN", method = "REML")
+		# res.reg <- rma(yi = beta_reg, sei = SE_reg, data = iDout, measure = "GEN", method = "REML")
 
 		# meta-analysis for ARIMAX models adjusted per study arm
-		# res.mod <- rma(yi = iDout[,"beta"], sei = iDout[,"SE"], mods = impactIDs[, Arm], measure = "GEN", method = "REML")
+		# res.mod <- rma(yi = beta, sei = SE, data = iDout, mods = Arm, measure = "GEN", method = "REML")
 
 		mainOut[paste(iout, iproc, sep = "-"), "beta"] <- res.nomod$beta[1]
 		mainOut[paste(iout, iproc, sep = "-"), c("SE", "I2", "Q")] <- unlist(res.nomod[c("se", "I2", "QE")])
 
 
-		iDout <- as.data.table(iDout, keep.rownames = "ParticipantID")
 		mainOut[paste(iout, iproc, sep = "-"), beta_bands] <- iDout[, betaq := factor(fcase(between(beta, -.1, .1, incbounds = TRUE), 0, 
 												    between(beta, .1, .2, incbounds = TRUE), 1, 
 												    between(beta, .2, .3, incbounds = TRUE), 2, 
@@ -350,7 +363,25 @@ for(ixout in seq_along(outcomes)){
 											      labels = beta_bands)
 									    ][levels(betaq), on = "betaq", .N, by = .EACHI
 									    ][, round(100 * N/sum(N), 2)]
-		pooledOut[[paste(iout, iproc, sep = "-")]] <- iDout
+
+		rm(res.nomod)
+
+
+		for(arm in levels(impactdtres$Arm)){
+			sarm <- sub("\\+", "", arm)
+			
+			# meta-analysis for ARIMAX models
+			res.nomod <- rma(yi = beta, sei = SE, data = iDout, measure = "GEN", method = "REML", subset = Arm == arm)
+
+			mainOutArm[[sarm]][paste(iout, iproc, sep = "-"), "beta"] <- res.nomod$beta[1]
+			mainOutArm[[sarm]][paste(iout, iproc, sep = "-"), c("SE", "I2", "Q")] <- unlist(res.nomod[c("se", "I2", "QE")])
+
+			mainOutArm[[sarm]][paste(iout, iproc, sep = "-"), beta_bands] <- iDout[Arm == arm
+											       ][levels(betaq), on = "betaq", .N, by = .EACHI
+											       ][, round(100 * N/sum(N), 2)]
+
+			rm(res.nomod)
+		}
 
 		rm(iDout)
 		gc()
@@ -359,17 +390,29 @@ for(ixout in seq_along(outcomes)){
 
 iDout <- rbindlist(pooledOut, idcol = "OPinteraction")[, c("outcome", "process") := tstrsplit(OPinteraction, split = "-", fixed = TRUE)]
 
-T2 <- iDout[, .(reg_avg = mean(beta_reg, na.rm = TRUE),
-		iARIMAX_avg = mean(beta, na.rm = TRUE),
-		cor_reg_iARIMAX = cor(beta, beta_reg, use = "complete.obs"),
-		reg_avg_SE = mean(SE_reg, na.rm = TRUE),
-		iARIMAX_avg_SE = mean(SE, na.rm = TRUE)),
+T2 <- iDout[, .(reg_avg = mean(abs(beta_reg), na.rm = TRUE),
+		iARIMAX_avg = mean(abs(beta), na.rm = TRUE),
+		cor_reg_iARIMAX = cor(abs(beta), abs(beta_reg), use = "complete.obs"),
+		reg_avg_SE = mean(abs(SE_reg), na.rm = TRUE),
+		iARIMAX_avg_SE = mean(abs(SE), na.rm = TRUE)),
 	    by = outcome]
+
+T2 <- transpose(T2, make.names = "outcome", keep.names = "Strength of relationship measure")
 
 # forest(res.nomod, slab = paste0(impactIDs[, ParticipantID], " (", impactIDs[, Arm], ")"))
 
 
+for(arm in levels(impactdtres$Arm)){
+	sarm <- sub("\\+", "", arm)
+	T2arm[[sarm]] <- iDout[Arm == arm, .(reg_avg = mean(abs(beta_reg), na.rm = TRUE), 
+					     iARIMAX_avg = mean(abs(beta), na.rm = TRUE), 
+					     cor_reg_iARIMAX = cor(abs(beta), abs(beta_reg), use = "complete.obs"),
+					     reg_avg_SE = mean(abs(SE_reg), na.rm = TRUE),
+					     iARIMAX_avg_SE = mean(abs(SE), na.rm = TRUE)), 
+			       by = outcome]
 
+	T2arm[[sarm]] <- transpose(T2arm[[sarm]], make.names = "outcome", keep.names = "Strength of relationship measure")
+}
 
 # saving matrices
 sheet_list <- list("iARIMA order frequencies" = list(round(T1*100, 2), TRUE), 
@@ -382,10 +425,22 @@ for(sheetname in names(sheet_list)){
 	writeData(wbmeta, sheet = sheetname, sheet_list[[sheetname]][[1]], rowNames = sheet_list[[sheetname]][[2]], colNames = TRUE)
 }
 
-#R!! iARIMAX models per arm
 
 for(arm in levels(impactdtres$Arm)){
 	sarm <- sub("\\+", "", arm)
+
+	# saving matrices
+	sheet_list <- list("iARIMA T1" = list(round(T1arm[[sarm]]*100, 2), TRUE), 
+			   "iARIMA patterns" = list(T11arm[[sarm]], FALSE), 
+			   "iARIMAX T2" = list(T2arm[[sarm]], FALSE), # save T2 
+			   "iARIMAX meta" = list(mainOutArm[[sarm]], TRUE)) # save T3
+
+	names(sheet_list) <- paste(names(sheet_list), sarm, sep = "-")
+
+	for(sheetname in names(sheet_list)){
+		addWorksheet(wbmeta, sheetName = sheetname)
+		writeData(wbmeta, sheet = sheetname, sheet_list[[sheetname]][[1]], rowNames = sheet_list[[sheetname]][[2]], colNames = TRUE)
+	}
 
 }
 
