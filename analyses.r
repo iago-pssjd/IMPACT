@@ -243,9 +243,9 @@ rownames(T1) <- paste(rep(ARIMA_parameters, each = 3), ":", c("None", "One", "Ov
 colnames(T1) <- outcomes
 T1list <- list()
 
-mainOut <- matrix(data = NA, nrow = length(processes) * length(outcomes), ncol = 4 + length(beta_bands))
+mainOut <- matrix(data = NA, nrow = length(processes) * length(outcomes), ncol = 5 + length(beta_bands) + length(moderators) * 3 + 3)
 rownames(mainOut) <- paste(rep(outcomes, each = length(processes)), processes, sep = "-")
-colnames(mainOut) <- c("beta", "SE", "I2", "Q", beta_bands)
+colnames(mainOut) <- c("beta", "SE", "p", "I2", "Q", beta_bands, beta_moderators, SE_moderators, p_moderators, "I2mod", "QEmod", "QMmod")
 pooledOut <- list()
 
 
@@ -352,7 +352,7 @@ for(ixout in seq_along(outcomes)){
 		# res.modArm <- rma(yi = beta, sei = SE, data = iDout, mods = Arm, measure = "GEN", method = "REML")
 
 		mainOut[paste(iout, iproc, sep = "-"), "beta"] <- res.nomod$beta[1]
-		mainOut[paste(iout, iproc, sep = "-"), c("SE", "I2", "Q")] <- unlist(res.nomod[c("se", "I2", "QE")])
+		mainOut[paste(iout, iproc, sep = "-"), c("SE", "p", "I2", "Q")] <- unlist(res.nomod[c("se", "pval", "I2", "QE")])
 
 
 		mainOut[paste(iout, iproc, sep = "-"), beta_bands] <- iDout[, betaq := factor(fcase(between(beta, -.1, .1, incbounds = TRUE), 0, 
