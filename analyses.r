@@ -263,14 +263,13 @@ names(T2arm) <- sarm
 for(ixout in seq_along(outcomes)){
 	# ixout <- 1
 	iout <- outcomes[ixout]
-	opDT <- impactdtres[, c(.(ParticipantID = ParticipantID, Time = Time, Time_Series = Time_Series), .SD), .SDcols = c(iout)]
 	iDout <- matrix(data = NA, nrow = nrow(impactIDs), ncol = 7)
 	rownames(iDout) <- impactIDs[, ParticipantID]
 	colnames(iDout) <- ARIMA_parameters
 	for(ixid in seq_len(nrow(impactIDs))){
 		# ixid <- 1
 		iD <- impactIDs[ixid, ParticipantID]
-		iDdt <- opDT[ParticipantID == iD]
+		iDdt <- impactdtres[ParticipantID == iD]
 		dt2ts <- ts(iDdt[, iout, with = FALSE])
 		iDfit <- auto.arima(dt2ts)
 		iDout[ixid, ARIMA_parameters] <- iDfit$arma[c(1, 6, 2, 5, 3, 7, 4)]
@@ -313,14 +312,13 @@ for(ixout in seq_along(outcomes)){
 	for(ixproc in seq_along(processes)){
 		# ixproc <- 3
 		iproc <- processes[ixproc]
-		opDT <- impactdtres[, c(.(ParticipantID = ParticipantID, Time = Time, Time_Series = Time_Series), .SD), .SDcols = c(iout, iproc)]
 		iDout <- matrix(data = NA, nrow = nrow(impactIDs), ncol = 4 + length(ARIMA_parameters))
 		rownames(iDout) <- impactIDs[, ParticipantID]
 		colnames(iDout) <- c("beta", "SE", ARIMA_parameters, "beta_reg", "SE_reg")
 		for(ixid in seq_len(nrow(impactIDs))){
 			# ixid <- 56
 			iD <- impactIDs[ixid, ParticipantID]
-			iDdt <- opDT[ParticipantID == iD]
+			iDdt <- impactdtres[ParticipantID == iD]
 			dt2ts <- ts(iDdt[, iout, with = FALSE])
 			dt2xreg <- as.matrix(iDdt[, iproc, with = FALSE])
 			iDfit <- try(auto.arima(dt2ts, xreg = dt2xreg), silent = TRUE)
