@@ -228,11 +228,15 @@ for(arm in levels(impactdtres$Arm)){
 
 #R! iARIMAX models
 
-impactIDs <- unique(impactdtres[, .(ParticipantID, Arm)])
+impactIDs <- unique(impactdtres[, .(ParticipantID, Arm, Wave, N_sessions, Completers, Years_diagnosis, Age, Gender, Depression_diagnosis, (.SD)), .SDcols = BPI_Pre:PIPS_FollowUp])[, `:=` (age = droplevels(cut(Age, breaks = seq(15, 70, 5))), Gender = droplevels(Gender))]
 ARIMA_parameters <- c("p", "d", "q", "s", "P", "D", "Q")
 beta_bands <- c("(-Inf, -0.3)", "[-0.3, -0.2)", "[-0.2, -0.1)", "[-0.1, 0.1]", "(0.1, 0.2]", "(0.2, 0.3]", "(0.3, +Inf)")
-
-
+# moderators <- c("Gender", "age", "Depression_diagnosis", "BPI_Pre", "NRS_Pre", "DASS21_Ans_Pre", "DASS21_Dep_Pre", "DASS21_St_Pre", "PCS_Pre", "CPAQ_Pre", "BADSSF_Pre", "PIPS_Pre")
+# dput(attr(res.mod$b, "dimnames")[[1]])
+moderators <- c("intrcpt", "GenderFemale", "age(40,45]", "age(45,50]", "age(50,55]", "age(55,60]", "age(60,65]", "age(65,70]", "Depression_diagnosisDepression", "BPI_Pre", "NRS_Pre", "DASS21_Ans_Pre", "DASS21_Dep_Pre", "DASS21_St_Pre", "PCS_Pre", "CPAQ_Pre", "BADSSF_Pre", "PIPS_Pre")
+beta_moderators <- paste("betamod", moderators, sep = "_")
+SE_moderators <- paste("SEmod", moderators, sep = "_")
+p_moderators <- paste("pmod", moderators, sep = "_")
 
 T1 <- matrix(data = NA, nrow = length(ARIMA_parameters)*3, ncol = length(outcomes))
 rownames(T1) <- paste(rep(ARIMA_parameters, each = 3), ":", c("None", "One", "Over One"))
@@ -333,18 +337,19 @@ for(ixout in seq_along(outcomes)){
 			rm(dt2ts, dt2xreg, iDfit)
 		}
 
-		iDout <- as.data.table(iDout, keep.rownames = "ParticipantID")[, Arm := impactIDs[, Arm]]
+		iDout <- merge(as.data.table(iDout, keep.rownames = "ParticipantID"), impactIDs, by = "ParticipantID")
 		pooledOut[[paste(iout, iproc, sep = "-")]] <- iDout
 
 
 		# meta-analysis for ARIMAX models
 		res.nomod <- rma(yi = beta, sei = SE, data = iDout, measure = "GEN", method = "REML")
+		res.mod <- rma(yi = beta, sei = SE, mods = ~ Gender + age + Depression_diagnosis + BPI_Pre + NRS_Pre + DASS21_Ans_Pre + DASS21_Dep_Pre + DASS21_St_Pre + PCS_Pre + CPAQ_Pre + BADSSF_Pre + PIPS_Pre, data = iDout, measure = "GEN", method = "REML")
 
 		# meta-analysis for regression models
 		# res.reg <- rma(yi = beta_reg, sei = SE_reg, data = iDout, measure = "GEN", method = "REML")
 
 		# meta-analysis for ARIMAX models adjusted per study arm
-		# res.mod <- rma(yi = beta, sei = SE, data = iDout, mods = Arm, measure = "GEN", method = "REML")
+		# res.modArm <- rma(yi = beta, sei = SE, data = iDout, mods = Arm, measure = "GEN", method = "REML")
 
 		mainOut[paste(iout, iproc, sep = "-"), "beta"] <- res.nomod$beta[1]
 		mainOut[paste(iout, iproc, sep = "-"), c("SE", "I2", "Q")] <- unlist(res.nomod[c("se", "I2", "QE")])
