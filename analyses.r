@@ -9,7 +9,13 @@ if(Sys.info()["sysname"] == "Linux"){
 			    "/", 
 			    system(paste0("ls /media/", system("whoami", intern = TRUE)), intern = TRUE), 
 			    "/Dropbox/juanpablo spanish pain study/")
+	data_NCpath <- paste0("/media/", 
+			    system("whoami", intern = TRUE), 
+			    "/", 
+			    system(paste0("ls /media/", system("whoami", intern = TRUE)), intern = TRUE), 
+			    "/ExtNC/PSSJD_other/IMPACT/")
 	data_path <- data_path[file.exists(data_path)]
+	data_NCpath <- data_NCpath[file.exists(data_NCpath)]
 	dev_lib_path <- "~/R/x86_64-pc-linux-gnu-library/dev"
 } else if(Sys.info()["sysname"] == "Windows"){
 	data_path <- paste0(grep("^[A-Z]:$", sub(":(.*)", ":",shell("wmic logicaldisk get name", intern = TRUE)), value = TRUE), "/NCext/PSSJD_other/IMPACT")
@@ -481,3 +487,23 @@ for(arm in levels(impactdtres$Arm)){
 saveWorkbook(wb, paste0(data_path, "multilevel-models.xlsx"), overwrite = TRUE)
 saveWorkbook(wbcwb, paste0(data_path, "correlations-within-between.xlsx"), overwrite = TRUE)
 saveWorkbook(wbmeta, paste0(data_path, "iARIMAX.xlsx"), overwrite = TRUE)
+
+
+
+#R! Covariables descriptives
+
+wbcov <- loadWorkbook(file = paste0(data_NCpath, "iARIMAX.xlsx"))
+
+addWorksheet(wbcov, sheetName = "Global covariates N")
+writeData(wbcov, sheet = "Global covariates N", as.data.frame(unclass(summary(impactIDs[, moderators, with = FALSE]))), rowNames = FALSE, colNames = TRUE)
+
+
+for(arm in levels(impactdtres$Arm)){
+	sarm <- sub("\\+", "", arm)
+	addWorksheet(wbcov, sheetName = paste(sarm,"covariates N"))
+	writeData(wbcov, sheet = paste(sarm, "covariates N"), as.data.frame(unclass(summary(impactIDs[Arm == arm, moderatorsArm[[sarm]], with = FALSE]))), rowNames = FALSE, colNames = TRUE)
+
+}
+
+
+saveWorkbook(wbcov, paste0(data_NCpath, "iARIMAX.xlsx"), overwrite = TRUE)
