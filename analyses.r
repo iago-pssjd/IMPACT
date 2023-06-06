@@ -20,7 +20,7 @@ if(Sys.info()["sysname"] == "Linux"){
 } else if(Sys.info()["sysname"] == "Windows"){
 	data_path <- paste0(grep("^[A-Z]:$", sub(":(.*)", ":",shell("wmic logicaldisk get name", intern = TRUE)), value = TRUE), "/NCext/PSSJD_other/IMPACT")
 	data_path <- data_path[file.exists(data_path)]
-	data_path <- paste0(data_path, "/")
+	data_NCpath <- data_path <- paste0(data_path, "/")
 	dev_lib_path <- .libPaths()
 }
 
@@ -253,11 +253,12 @@ rownames(T1) <- paste(rep(ARIMA_parameters, each = 3), ":", c("None", "One", "Ov
 colnames(T1) <- outcomes
 T1list <- list()
 
-mainOut <- matrix(data = NA, nrow = length(processes) * length(outcomes), ncol = 6 + length(beta_bands) + 5)
+mainOut <- matrix(data = NA, nrow = length(processes) * length(outcomes), ncol = 6 + length(beta_bands) + 5 * 2)
 rownames(mainOut) <- paste(rep(outcomes, each = length(processes)), processes, sep = "-")
-colnames(mainOut) <- c("beta", "SE", "p", "I2", "Q", "pQ", beta_bands, "I2mod", "QEmod", "pQEmod", "QMmod", "pQMmod")
+colnames(mainOut) <- c("beta", "SE", "p", "I2", "Q", "pQ", beta_bands, "I2mod", "QEmod", "pQEmod", "QMmod", "pQMmod", "I2arm", "QEarm", "pQEarm", "QMarm", "pQMarm")
 pooledOut <- list()
 modOut <- list()
+modArmOut <- list()
 
 sarm <- sub("\\+", "", levels(impactdtres$Arm))
 
@@ -268,7 +269,7 @@ names(T1arm) <- sarm
 T11arm <- vector(mode = "list", length = length(sarm))
 names(T11arm) <- sarm
 
-mainOutArm <- list(mainOut, mainOut, mainOut)
+mainOutArm <- list(mainOut[, -grep("arm", colnames(mainOut))], mainOut[, -grep("arm", colnames(mainOut))], mainOut[, -grep("arm", colnames(mainOut))])
 names(mainOutArm) <- sarm
 T2arm <- vector(mode = "list", length = length(sarm))
 names(T2arm) <- sarm
@@ -332,6 +333,7 @@ for(ixout in seq_along(outcomes)){
 	for(ixproc in seq_along(processes)){
 		# ixproc <- 3
 		iproc <- processes[ixproc]
+		iopString <- paste(iout, iproc, sep = "-")
 		iDout <- matrix(data = NA, nrow = nrow(impactIDs), ncol = 4 + length(ARIMA_parameters))
 		rownames(iDout) <- impactIDs[, ParticipantID]
 		colnames(iDout) <- c("beta", "SE", ARIMA_parameters, "beta_reg", "SE_reg")
@@ -354,27 +356,36 @@ for(ixout in seq_along(outcomes)){
 		}
 
 		iDout <- merge(as.data.table(iDout, keep.rownames = "ParticipantID"), impactIDs, by = "ParticipantID")
-		pooledOut[[paste(iout, iproc, sep = "-")]] <- iDout
+		pooledOut[[iopString]] <- iDout
 
 
 		# meta-analysis for ARIMAX models
 		res.nomod <- rma(yi = beta, sei = SE, data = iDout, measure = "GEN", method = "REML")
 		res.mod <- rma(yi = beta, sei = SE, mods = reformulate(termlabels = moderators), data = iDout, measure = "GEN", method = "REML")
 		
-		modOut[[paste(iout, iproc, sep = "-")]] <- as.data.table(do.call(cbind, res.mod[c("beta", "se", "pval")]), keep.rownames = "IV")
+		modOut[[iopString]] <- as.data.table(do.call(cbind, res.mod[c("beta", "se", "pval")]), keep.rownames = "IV")
 
 		# meta-analysis for regression models
 		# res.reg <- rma(yi = beta_reg, sei = SE_reg, data = iDout, measure = "GEN", method = "REML")
 
 		# meta-analysis for ARIMAX models adjusted per study arm
-		# res.modArm <- rma(yi = beta, sei = SE, data = iDout, mods = Arm, measure = "GEN", method = "REML")
+		res.modArm <- rma(yi = beta, sei = SE, data = iDout, mods = ~ Arm, measure = "GEN", method = "REML")
 
-		mainOut[paste(iout, iproc, sep = "-"), "beta"] <- res.nomod$beta[1]
-		mainOut[paste(iout, iproc, sep = "-"), c("SE", "p", "I2", "Q", "pQ")] <- unlist(res.nomod[c("se", "pval", "I2", "QE", "QEp")])
-		mainOut[paste(iout, iproc, sep = "-"), c("I2mod", "QEmod", "pQEmod", "QMmod", "pQMmod")] <- unlist(res.mod[c("I2", "QE", "QEp", "QM", "QMp")])
+		modArmOut[[iopString]] <- as.data.table(do.call(cbind, res.modArm[c("beta", "se", "pval")]), keep.rownames = "IV")
+		
+		if(Sys.info()["sysname"] == "Windows"){
+			png(paste0(data_path, "graphics/iARIMAX/forestplots/", iout, "-", iproc, ".png"), bg = "transparent", width = 7, height = 10, units = "cm", res = 600, pointsize = 1, type = "windows", antialias = "cleartype")
+			print(forest(res.nomod, annotate = FALSE, slab = NA, order = "obs", lwd = 0.5))
+			dev.off()
+		}
+
+		mainOut[iopString, "beta"] <- res.nomod$beta[1]
+		mainOut[iopString, c("SE", "p", "I2", "Q", "pQ")] <- unlist(res.nomod[c("se", "pval", "I2", "QE", "QEp")])
+		mainOut[iopString, c("I2mod", "QEmod", "pQEmod", "QMmod", "pQMmod")] <- unlist(res.mod[c("I2", "QE", "QEp", "QM", "QMp")])
+		mainOut[iopString, c("I2arm", "QEarm", "pQEarm", "QMarm", "pQMarm")] <- unlist(res.modArm[c("I2", "QE", "QEp", "QM", "QMp")])
 
 
-		mainOut[paste(iout, iproc, sep = "-"), beta_bands] <- iDout[, betaq := factor(fcase(between(beta, -.1, .1, incbounds = TRUE), 0, 
+		mainOut[iopString, beta_bands] <- iDout[, betaq := factor(fcase(between(beta, -.1, .1, incbounds = TRUE), 0, 
 												    between(beta, .1, .2, incbounds = TRUE), 1, 
 												    between(beta, .2, .3, incbounds = TRUE), 2, 
 												    beta > .3, 3, 
@@ -386,7 +397,7 @@ for(ixout in seq_along(outcomes)){
 									    ][levels(betaq), on = "betaq", .N, by = .EACHI
 									    ][, round(100 * N/sum(N), 2)]
 
-		rm(res.nomod, res.mod)
+		rm(res.nomod, res.mod, res.modArm)
 
 
 		for(arm in levels(impactdtres$Arm)){
@@ -395,13 +406,19 @@ for(ixout in seq_along(outcomes)){
 			# meta-analysis for ARIMAX models
 			res.nomod <- rma(yi = beta, sei = SE, data = iDout, measure = "GEN", method = "REML", subset = Arm == arm)
 			res.mod <- rma(yi = beta, sei = SE, mods = reformulate(termlabels = moderatorsArm[[sarm]]), data = iDout, measure = "GEN", method = "REML", subset = Arm == arm)
-			modOutArm[[sarm]][[paste(iout, iproc, sep = "-")]] <- as.data.table(do.call(cbind, res.mod[c("beta", "se", "pval")]), keep.rownames = "IV")
+			modOutArm[[sarm]][[iopString]] <- as.data.table(do.call(cbind, res.mod[c("beta", "se", "pval")]), keep.rownames = "IV")
 
-			mainOutArm[[sarm]][paste(iout, iproc, sep = "-"), "beta"] <- res.nomod$beta[1]
-			mainOutArm[[sarm]][paste(iout, iproc, sep = "-"), c("SE", "p", "I2", "Q", "pQ")] <- unlist(res.nomod[c("se", "pval", "I2", "QE", "QEp")])
-			mainOutArm[[sarm]][paste(iout, iproc, sep = "-"), c("I2mod", "QEmod", "pQEmod", "QMmod", "pQMmod")] <- unlist(res.mod[c("I2", "QE", "QEp", "QM", "QMp")])
+			if(Sys.info()["sysname"] == "Windows"){
+				png(paste0(data_path, "graphics/iARIMAX/forestplots/", sarm, "/", iout, "-", iproc, ".png"), bg = "transparent", width = 7, height = 10, units = "cm", res = 600, pointsize = 1, type = "windows", antialias = "cleartype")
+				print(forest(res.nomod, annotate = FALSE, slab = NA, order = "obs", lwd = 0.5))
+				dev.off()
+			}
 
-			mainOutArm[[sarm]][paste(iout, iproc, sep = "-"), beta_bands] <- iDout[Arm == arm
+			mainOutArm[[sarm]][iopString, "beta"] <- res.nomod$beta[1]
+			mainOutArm[[sarm]][iopString, c("SE", "p", "I2", "Q", "pQ")] <- unlist(res.nomod[c("se", "pval", "I2", "QE", "QEp")])
+			mainOutArm[[sarm]][iopString, c("I2mod", "QEmod", "pQEmod", "QMmod", "pQMmod")] <- unlist(res.mod[c("I2", "QE", "QEp", "QM", "QMp")])
+
+			mainOutArm[[sarm]][iopString, beta_bands] <- iDout[Arm == arm
 											       ][levels(betaq), on = "betaq", .N, by = .EACHI
 											       ][, round(100 * N/sum(N), 2)]
 
@@ -413,11 +430,15 @@ for(ixout in seq_along(outcomes)){
 	}
 }
 
+
+
 iDout <- rbindlist(pooledOut, idcol = "OPinteraction")[, c("outcome", "process") := tstrsplit(OPinteraction, split = "-", fixed = TRUE)]
 
 modOut <- rbindlist(modOut, idcol = "OPinteraction")[, c("outcome", "process") := tstrsplit(OPinteraction, split = "-", fixed = TRUE)]
+modArmOut <- rbindlist(modArmOut, idcol = "OPinteraction")[, c("outcome", "process") := tstrsplit(OPinteraction, split = "-", fixed = TRUE)]
 
 setnames(modOut, old = c("IV", "V1", "se", "pval"), new = c("covariate", "beta", "SE", "p"))
+setnames(modArmOut, old = c("IV", "V1", "se", "pval"), new = c("covariate", "beta", "SE", "p"))
 
 T2 <- iDout[, .(reg_avg = mean(abs(beta_reg), na.rm = TRUE),
 		iARIMAX_avg = mean(abs(beta), na.rm = TRUE),
@@ -429,7 +450,7 @@ T2 <- iDout[, .(reg_avg = mean(abs(beta_reg), na.rm = TRUE),
 T2 <- transpose(T2, make.names = "outcome", keep.names = "Strength of relationship measure")
 
 # forest(res.nomod, slab = paste0(impactIDs[, ParticipantID], " (", impactIDs[, Arm], ")"))
-
+# forest(res.nomod, annotate = FALSE, slab = NA, order = "obs")
 
 for(arm in levels(impactdtres$Arm)){
 	sarm <- sub("\\+", "", arm)
@@ -453,7 +474,8 @@ sheet_list <- list("iARIMA order frequencies" = list(round(T1*100, 2), TRUE),
 		   "Individual models output" = list(iDout, FALSE), # save matrix of individual models outputs
 		   "iARIMAX-regression comparison" = list(T2, FALSE), # save T2 
 		   "iARIMAX meta-analysis" = list(mainOut, TRUE), # save T3
-		   "iARIMAX meta-an moderators" = list(modOut, FALSE))
+		   "iARIMAX meta-an moderators" = list(modOut, FALSE),
+		   "iARIMAX meta-an ARM mod" = list(modArmOut, FALSE))
 for(sheetname in names(sheet_list)){
 	addWorksheet(wbmeta, sheetName = sheetname)
 	writeData(wbmeta, sheet = sheetname, sheet_list[[sheetname]][[1]], rowNames = sheet_list[[sheetname]][[2]], colNames = TRUE)
@@ -483,10 +505,10 @@ for(arm in levels(impactdtres$Arm)){
 
 #R! Save
 
-
 saveWorkbook(wb, paste0(data_path, "multilevel-models.xlsx"), overwrite = TRUE)
 saveWorkbook(wbcwb, paste0(data_path, "correlations-within-between.xlsx"), overwrite = TRUE)
 saveWorkbook(wbmeta, paste0(data_path, "iARIMAX.xlsx"), overwrite = TRUE)
+save(T1, T1arm, T1list, iDout, modOut, modOutArm, modArmOut, mainOut, mainOutArm, file = paste0(data_path, "iARIMAX.rdata"))
 
 
 
