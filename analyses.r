@@ -534,14 +534,21 @@ saveWorkbook(wbcov, paste0(data_NCpath, "iARIMAX.xlsx"), overwrite = TRUE)
 #R! Id strength plots
 
 
-load(paste0(data_path, "iARIMAX.rdata"))
+load(paste0(data_NCpath, "iARIMAX.rdata"))
 
 for(idx in seq_len(nrow(impactIDs))){
 	idsp <- impactIDs[idx, "ParticipantID"]
 	for(ixout in seq_along(outcomes)){
 		iout <- outcomes[ixout]
 		idout <-iDout[ParticipantID == idsp & outcome == iout, .(ParticipantID, outcome, beta, SE, process)]
-		idforest <- forest(x = idout$beta, sei = idout$SE, slab = idout$process)
-		ltext(idforest$textpos[1], -1, "RE Model", pos = 4, cex = NULL)
+		res.id <- try(rma(yi = beta, sei = SE, data = idout, measure = "GEN", method = "REML"), silent = TRUE)
+		if(!inherits(res.id, what = "try-error", which = FALSE)){
+			if(Sys.info()["sysname"] == "Linux"){
+				png(paste0(data_NCpath, "graphics/iARIMAX/idplots/", iout, "-id", idsp, ".png"), bg = "transparent", width = 4800, height = 4800, units = "px", res = 320, type = "cairo")
+				print(forest(x = res.id, slab = idout$process, main = paste(iout, idsp)))
+				dev.off()
+			}
+		}
+		rm(res.id)
 	}
 }
