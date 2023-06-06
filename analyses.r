@@ -529,3 +529,17 @@ for(arm in levels(impactdtres$Arm)){
 
 
 saveWorkbook(wbcov, paste0(data_NCpath, "iARIMAX.xlsx"), overwrite = TRUE)
+
+
+#R! Id strength plots
+
+
+load(paste0(data_path, "iARIMAX.rdata"))
+
+for(idx in seq_len(nrow(impactIDs))){
+	idsp <- impactIDs[idx, "ParticipantID"]
+	for(ixout in seq_along(outcomes)){
+		iout <- outcomes[ixout]
+		idout <-iDout[ParticipantID == idsp & outcome == iout, .(ParticipantID, outcome, beta, SE, process)]
+	}
+}
