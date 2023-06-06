@@ -541,5 +541,6 @@ for(idx in seq_len(nrow(impactIDs))){
 	for(ixout in seq_along(outcomes)){
 		iout <- outcomes[ixout]
 		idout <-iDout[ParticipantID == idsp & outcome == iout, .(ParticipantID, outcome, beta, SE, process)]
+		forest(x = idout$beta, sei = idout$SE, slab = idout$process)
 	}
 }
