@@ -98,6 +98,13 @@ dotplot.ranef.mer <- function(x, data, main = TRUE, transf = I, ...){
 impactdt <- read_sav(paste0(data_path, "Dataset_IMPACT-EMA_v2.sav"))
 impactdt <- as_factor(impactdt)
 setDT(impactdt)
+
+respondersdt <- read_sav(paste0(data_NCpath, "Responders (wide form).sav"))
+respondersdt <- as_factor(respondersdt)
+setDT(respondersdt)
+
+impactdt <- merge(impactdt, respondersdt, by.x = "ParticipantID", by.y = "ID", all.x = TRUE, all.y = FALSE)
+
 # wb <- createWorkbook()
 # wbcwb <- createWorkbook()
 wbmeta <- createWorkbook()
@@ -234,7 +241,7 @@ for(arm in levels(impactdtres$Arm)){
 
 #R! iARIMAX models
 
-impactIDs <- unique(impactdtres[, .(ParticipantID, Arm, Wave, N_sessions, Completers, Years_diagnosis, Age, Gender, Depression_diagnosis, (.SD)), .SDcols = BPI_Pre:PIPS_FollowUp])[, `:=` (age = droplevels(cut(Age, breaks = c(0,50,55,60,+Inf), right = TRUE)), 
+impactIDs <- unique(impactdtres[, .(ParticipantID, Arm, Wave, N_sessions, Completers, Years_diagnosis, Age, Gender, Depression_diagnosis, (.SD)), .SDcols = BPI_Pre:Responder_FollowUp])[, `:=` (age = droplevels(cut(Age, breaks = c(0,50,55,60,+Inf), right = TRUE)), 
 																							    Gender = droplevels(Gender),
 																							    years_diagnosis = droplevels(cut(Years_diagnosis, breaks = c(0,5,10,20,+Inf), right = TRUE)))]
 ARIMA_parameters <- c("p", "d", "q", "s", "P", "D", "Q")
