@@ -292,8 +292,10 @@ for(ixout in seq_along(outcomes)){
 		iD <- impactIDs[ixid, ParticipantID]
 		iDdt <- impactdtres[ParticipantID == iD]
 		dt2ts <- ts(iDdt[, iout, with = FALSE])
-		iDfit <- auto.arima(dt2ts)
-		iDout[ixid, ARIMA_parameters] <- iDfit$arma[c(1, 6, 2, 5, 3, 7, 4)]
+		iDfit <- try(auto.arima(dt2ts), silent = TRUE)
+		if(!inherits(iDfit, what = "try-error", which = FALSE)){
+			iDout[ixid, ARIMA_parameters] <- iDfit$arma[c(1, 6, 2, 5, 3, 7, 4)]
+		}
 		rm(dt2ts, iDfit)
 	}
 	iDout2 <- apply(iDout, 2, cut, breaks = c(-Inf, 0.5, 1.5, Inf), labels = c("None", "One", "Over One"))
@@ -349,10 +351,12 @@ for(ixout in seq_along(outcomes)){
 				iDout[ixid, "SE"] <- sqrt(iDfit$var.coef[iproc, iproc])
 				iDout[ixid, ARIMA_parameters] <- iDfit$arma[c(1, 6, 2, 5, 3, 7, 4)]
 			}
-			iDregression <- lm(reformulate(iproc, response = iout), data = iDdt)
-			iDout[ixid, "beta_reg"] <- coef(iDregression)[[iproc]]
-			iDout[ixid, "SE_reg"] <- sqrt(vcov(iDregression)[iproc, iproc])
-			rm(dt2ts, dt2xreg, iDfit)
+			iDregression <- try(lm(reformulate(iproc, response = iout), data = iDdt), silent = TRUE)
+			if(!inherits(iDregression, what = "try-error", which = FALSE)){
+				iDout[ixid, "beta_reg"] <- coef(iDregression)[[iproc]]
+				iDout[ixid, "SE_reg"] <- sqrt(vcov(iDregression)[iproc, iproc])
+			}
+			rm(dt2ts, dt2xreg, iDfit, iDregression)
 		}
 
 		iDout <- merge(as.data.table(iDout, keep.rownames = "ParticipantID"), impactIDs, by = "ParticipantID")
@@ -360,42 +364,44 @@ for(ixout in seq_along(outcomes)){
 
 
 		# meta-analysis for ARIMAX models
-		res.nomod <- rma(yi = beta, sei = SE, data = iDout, measure = "GEN", method = "REML")
-		res.mod <- rma(yi = beta, sei = SE, mods = reformulate(termlabels = moderators), data = iDout, measure = "GEN", method = "REML")
+		res.nomod <- try(rma(yi = beta, sei = SE, data = iDout, measure = "GEN", method = "REML"), silent = TRUE)
+		res.mod <- try(rma(yi = beta, sei = SE, mods = reformulate(termlabels = moderators), data = iDout, measure = "GEN", method = "REML"), silent = TRUE)
 		
-		modOut[[iopString]] <- as.data.table(do.call(cbind, res.mod[c("beta", "se", "pval")]), keep.rownames = "IV")
-
+		if(!inherits(res.mod, what = "try-error", which = FALSE)){
+			modOut[[iopString]] <- as.data.table(do.call(cbind, res.mod[c("beta", "se", "pval")]), keep.rownames = "IV")
+			mainOut[iopString, c("I2mod", "QEmod", "pQEmod", "QMmod", "pQMmod")] <- unlist(res.mod[c("I2", "QE", "QEp", "QM", "QMp")])
+		}
 		# meta-analysis for regression models
 		# res.reg <- rma(yi = beta_reg, sei = SE_reg, data = iDout, measure = "GEN", method = "REML")
 
 		# meta-analysis for ARIMAX models adjusted per study arm
-		res.modArm <- rma(yi = beta, sei = SE, data = iDout, mods = ~ Arm, measure = "GEN", method = "REML")
+		res.modArm <- try(rma(yi = beta, sei = SE, data = iDout, mods = ~ Arm, measure = "GEN", method = "REML"), silent = TRUE)
 
-		modArmOut[[iopString]] <- as.data.table(do.call(cbind, res.modArm[c("beta", "se", "pval")]), keep.rownames = "IV")
+		if(!inherits(res.modArm, what = "try-error", which = FALSE)){
+			modArmOut[[iopString]] <- as.data.table(do.call(cbind, res.modArm[c("beta", "se", "pval")]), keep.rownames = "IV")
+			mainOut[iopString, c("I2arm", "QEarm", "pQEarm", "QMarm", "pQMarm")] <- unlist(res.modArm[c("I2", "QE", "QEp", "QM", "QMp")])
+		}
 		
-		if(Sys.info()["sysname"] == "Windows"){
-			png(paste0(data_path, "graphics/iARIMAX/forestplots/", iout, "-", iproc, ".png"), bg = "transparent", width = 7, height = 10, units = "cm", res = 600, pointsize = 1, type = "windows", antialias = "cleartype")
+		if(!inherits(res.nomod, what = "try-error", which = FALSE)){
+			png(paste0(data_path, "graphics/iARIMAX/forestplots/", iout, "-", iproc, ".png"), bg = "transparent", width = 4800, height = 6400, units = "px", res = 320, type = "cairo")
 			print(forest(res.nomod, annotate = FALSE, slab = NA, order = "obs", lwd = 0.5))
 			dev.off()
+			mainOut[iopString, "beta"] <- res.nomod$beta[1]
+			mainOut[iopString, c("SE", "p", "I2", "Q", "pQ")] <- unlist(res.nomod[c("se", "pval", "I2", "QE", "QEp")])
 		}
 
-		mainOut[iopString, "beta"] <- res.nomod$beta[1]
-		mainOut[iopString, c("SE", "p", "I2", "Q", "pQ")] <- unlist(res.nomod[c("se", "pval", "I2", "QE", "QEp")])
-		mainOut[iopString, c("I2mod", "QEmod", "pQEmod", "QMmod", "pQMmod")] <- unlist(res.mod[c("I2", "QE", "QEp", "QM", "QMp")])
-		mainOut[iopString, c("I2arm", "QEarm", "pQEarm", "QMarm", "pQMarm")] <- unlist(res.modArm[c("I2", "QE", "QEp", "QM", "QMp")])
 
 
 		mainOut[iopString, beta_bands] <- iDout[, betaq := factor(fcase(between(beta, -.1, .1, incbounds = TRUE), 0, 
-												    between(beta, .1, .2, incbounds = TRUE), 1, 
-												    between(beta, .2, .3, incbounds = TRUE), 2, 
-												    beta > .3, 3, 
-												    between(beta, -.2, -.1, incbounds = TRUE), -1, 
-												    between(beta, -.3, -.2, incbounds = TRUE), -2, 
-												    beta < -.3, -3), 
-											      levels = seq(-3, 3, 1), 
-											      labels = beta_bands)
-									    ][levels(betaq), on = "betaq", .N, by = .EACHI
-									    ][, round(100 * N/sum(N), 2)]
+										between(beta, .1, .2, incbounds = TRUE), 1, 
+										between(beta, .2, .3, incbounds = TRUE), 2, 
+										beta > .3, 3, 
+										between(beta, -.2, -.1, incbounds = TRUE), -1, 
+										between(beta, -.3, -.2, incbounds = TRUE), -2, 
+										beta < -.3, -3), 
+									  levels = seq(-3, 3, 1), labels = beta_bands)
+							][levels(betaq), on = "betaq", .N, by = .EACHI
+							][, round(100 * N/sum(N), 2)]
 
 		rm(res.nomod, res.mod, res.modArm)
 
@@ -404,23 +410,25 @@ for(ixout in seq_along(outcomes)){
 			sarm <- sub("\\+", "", arm)
 			
 			# meta-analysis for ARIMAX models
-			res.nomod <- rma(yi = beta, sei = SE, data = iDout, measure = "GEN", method = "REML", subset = Arm == arm)
-			res.mod <- rma(yi = beta, sei = SE, mods = reformulate(termlabels = moderatorsArm[[sarm]]), data = iDout, measure = "GEN", method = "REML", subset = Arm == arm)
-			modOutArm[[sarm]][[iopString]] <- as.data.table(do.call(cbind, res.mod[c("beta", "se", "pval")]), keep.rownames = "IV")
-
-			if(Sys.info()["sysname"] == "Windows"){
-				png(paste0(data_path, "graphics/iARIMAX/forestplots/", sarm, "/", iout, "-", iproc, ".png"), bg = "transparent", width = 7, height = 10, units = "cm", res = 600, pointsize = 1, type = "windows", antialias = "cleartype")
-				print(forest(res.nomod, annotate = FALSE, slab = NA, order = "obs", lwd = 0.5))
-				dev.off()
+			res.nomod <- try(rma(yi = beta, sei = SE, data = iDout, measure = "GEN", method = "REML", subset = Arm == arm), silent = TRUE)
+			res.mod <- try(rma(yi = beta, sei = SE, mods = reformulate(termlabels = moderatorsArm[[sarm]]), data = iDout, measure = "GEN", method = "REML", subset = Arm == arm), silent = TRUE)
+			if(!inherits(res.mod, what = "try-error", which = FALSE)){
+				modOutArm[[sarm]][[iopString]] <- as.data.table(do.call(cbind, res.mod[c("beta", "se", "pval")]), keep.rownames = "IV")
+				mainOutArm[[sarm]][iopString, c("I2mod", "QEmod", "pQEmod", "QMmod", "pQMmod")] <- unlist(res.mod[c("I2", "QE", "QEp", "QM", "QMp")])
 			}
 
-			mainOutArm[[sarm]][iopString, "beta"] <- res.nomod$beta[1]
-			mainOutArm[[sarm]][iopString, c("SE", "p", "I2", "Q", "pQ")] <- unlist(res.nomod[c("se", "pval", "I2", "QE", "QEp")])
-			mainOutArm[[sarm]][iopString, c("I2mod", "QEmod", "pQEmod", "QMmod", "pQMmod")] <- unlist(res.mod[c("I2", "QE", "QEp", "QM", "QMp")])
+			if(!inherits(res.nomod, what = "try-error", which = FALSE)){
+				png(paste0(data_path, "graphics/iARIMAX/forestplots/", sarm, "/", iout, "-", iproc, ".png"), bg = "transparent", width = 4800, height = 6400, units = "px", res = 320, type = "cairo")
+				print(forest(res.nomod, annotate = FALSE, slab = NA, order = "obs", lwd = 0.5))
+				dev.off()
+				mainOutArm[[sarm]][iopString, "beta"] <- res.nomod$beta[1]
+				mainOutArm[[sarm]][iopString, c("SE", "p", "I2", "Q", "pQ")] <- unlist(res.nomod[c("se", "pval", "I2", "QE", "QEp")])
+			}
+
 
 			mainOutArm[[sarm]][iopString, beta_bands] <- iDout[Arm == arm
-											       ][levels(betaq), on = "betaq", .N, by = .EACHI
-											       ][, round(100 * N/sum(N), 2)]
+									   ][levels(betaq), on = "betaq", .N, by = .EACHI
+									   ][, round(100 * N/sum(N), 2)]
 
 			rm(res.nomod, res.mod)
 		}
@@ -510,9 +518,9 @@ saveWorkbook(wbcwb, paste0(data_path, "correlations-within-between.xlsx"), overw
 saveWorkbook(wbmeta, paste0(data_path, "iARIMAX.xlsx"), overwrite = TRUE)
 save(T1, T1arm, T1list, iDout, modOut, modOutArm, modArmOut, mainOut, mainOutArm, file = paste0(data_path, "iARIMAX.rdata"))
 
+#R! Extra analysis
 
-
-#R! Covariables descriptives
+#R!! Covariables descriptives
 
 wbcov <- loadWorkbook(file = paste0(data_NCpath, "iARIMAX.xlsx"))
 
@@ -531,7 +539,7 @@ for(arm in levels(impactdtres$Arm)){
 saveWorkbook(wbcov, paste0(data_NCpath, "iARIMAX.xlsx"), overwrite = TRUE)
 
 
-#R! Id strength plots
+#R!! Id strength plots
 
 
 load(paste0(data_NCpath, "iARIMAX.rdata"))
@@ -543,12 +551,16 @@ for(idx in seq_len(nrow(impactIDs))){
 		idout <-iDout[ParticipantID == idsp & outcome == iout, .(ParticipantID, outcome, beta, SE, process)]
 		res.id <- try(rma(yi = beta, sei = SE, data = idout, measure = "GEN", method = "REML"), silent = TRUE)
 		if(!inherits(res.id, what = "try-error", which = FALSE)){
-			if(Sys.info()["sysname"] == "Linux"){
-				png(paste0(data_NCpath, "graphics/iARIMAX/idplots/", iout, "-id", idsp, ".png"), bg = "transparent", width = 4800, height = 4800, units = "px", res = 320, type = "cairo")
-				print(forest(x = res.id, slab = idout$process, main = paste(iout, idsp)))
-				dev.off()
-			}
+			png(paste0(data_NCpath, "graphics/iARIMAX/idplots/", iout, "-id", idsp, ".png"), bg = "transparent", width = 4800, height = 4800, units = "px", res = 320, type = "cairo")
+			print(forest(x = res.id, slab = idout$process, main = paste(iout, idsp)))
+			dev.off()
 		}
 		rm(res.id)
 	}
 }
+
+
+
+#R!! Cluster analysis
+
+
