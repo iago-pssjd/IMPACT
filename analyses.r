@@ -556,13 +556,14 @@ for(idx in seq_len(nrow(impactIDs))){
 	for(ixout in seq_along(outcomes)){
 		iout <- outcomes[ixout]
 		idout <-iDout[ParticipantID == idsp & outcome == iout, .(ParticipantID, outcome, beta, SE, process)]
-		res.id <- try(rma(yi = beta, sei = SE, data = idout, measure = "GEN", method = "REML"), silent = TRUE)
-		if(!inherits(res.id, what = "try-error", which = FALSE)){
-			png(paste0(data_NCpath, "graphics/iARIMAX/idplots/", iout, "-id", idsp, ".png"), bg = "transparent", width = 4800, height = 4800, units = "px", res = 320, type = "cairo")
-			print(forest(x = res.id, slab = idout$process, main = paste(iout, idsp)))
-			dev.off()
-		}
-		rm(res.id)
+		# res.id <- try(rma(yi = beta, sei = SE, data = idout, measure = "GEN", method = "REML"), silent = TRUE)
+		# if(!inherits(res.id, what = "try-error", which = FALSE)){
+		png(paste0(data_NCpath, "graphics/iARIMAX/idplots/", iout, "-id", idsp, ".png"), bg = "transparent", width = 4800, height = 4800, units = "px", res = 320, type = "cairo")
+		# print(forest(x = res.id, slab = idout$process, main = paste(iout, idsp)))
+		print(forest(x = idout$beta, sei = idout$SE, slab = idout$process, annotate = FALSE, main = paste(iout, idsp)))
+		dev.off()
+		# }
+		# rm(res.id)
 	}
 }
 
