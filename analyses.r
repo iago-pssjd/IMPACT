@@ -30,6 +30,7 @@ options(max.print=99999)
 
 
 library(openxlsx) # createWorkbook
+library(cluster)
 library(metafor)
 library(forecast)
 library(psych)
@@ -562,7 +563,7 @@ for(idx in seq_len(nrow(impactIDs))){
 		# print(forest(x = res.id, slab = idout$process, main = paste(iout, idsp)))
 		ci.lb <- with(idout, beta - SE * qnorm(0.05/2, lower.tail = FALSE))
 		ci.ub <- with(idout, beta + SE * qnorm(0.05/2, lower.tail = FALSE))
-		print(idforest <- forest(x = idout$beta, sei = idout$SE, slab = rep("", nrow(idout)), annotate = FALSE, main = paste(iout, idsp)))
+		print(idforest <- forest(x = idout$beta, sei = idout$SE, slab = rep("", nrow(idout)), col = ifelse(between(0, ci.lb, ci.ub), "red", "green"), annotate = FALSE, main = paste(iout, idsp)))
 		print(text(idforest$textpos[1], seq(nrow(idout), 1, -1), idout$process, pos = 4))
 		dev.off()
 		# }
@@ -575,3 +576,40 @@ for(idx in seq_len(nrow(impactIDs))){
 #R!! Cluster analysis
 
 
+clusterdt <- dcast(iDout[, .(ParticipantID, outcome, beta, SE, process, Arm)], ParticipantID + outcome + Arm ~ process, value.var = c("beta", "SE"))
+
+
+
+sink(paste0(data_NCpath, "kmedoidsclustering.txt"), split = TRUE)
+
+for(ixout in seq_along(outcomes)){
+	iout <- outcomes[ixout]
+	print(iout)
+	tmpdt <- clusterdt[outcome == iout, !c("ParticipantID", "outcome", "Arm")]
+	bnkmd <- c(NA, -Inf)
+	for(nkmd in 2:9){
+		print(paste(nkmd, "clusters"))
+		cat("\n")
+		pam.res <- pam(tmpdt, nkmd)
+		print("Summary of silhouette widths per cluster")
+		print(summary(pam.res$silinfo$clus.avg.widths))
+		print("(Weighted) Average silhouette width of total data set")
+		print(pam.res$silinfo$avg.width)
+		if(bnkmd[2] <= pam.res$silinfo$avg.width){
+			bnkmd[1] <- nkmd
+			bnkmd[2] <- pam.res$silinfo$avg.width
+		}
+		cat("\n")
+	}
+	# pam.res <- pam(tmpdt, bnkmd[1])
+	pam.res <- pam(tmpdt, 3)
+	png(paste0(data_NCpath, "graphics/iARIMAX/clusters/", iout, ".png"), bg = "transparent", width = 6400, height = 4800, units = "px", res = 320, type = "cairo")
+	par(mfcol = c(1,2))
+	plot(pam.res, which.plots = 1, main = paste("PAM clustering plot for", iout), col.p = clusterdt$Arm)
+	plot(pam.res, which.plots = 2, main = paste("PAM clustering silhouette plot for", iout))
+	dev.off()
+	cat("\n\n")
+
+
+}
+sink()
