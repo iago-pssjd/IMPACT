@@ -560,7 +560,10 @@ for(idx in seq_len(nrow(impactIDs))){
 		# if(!inherits(res.id, what = "try-error", which = FALSE)){
 		png(paste0(data_NCpath, "graphics/iARIMAX/idplots/", iout, "-id", idsp, ".png"), bg = "transparent", width = 4800, height = 4800, units = "px", res = 320, type = "cairo")
 		# print(forest(x = res.id, slab = idout$process, main = paste(iout, idsp)))
-		print(forest(x = idout$beta, sei = idout$SE, slab = idout$process, annotate = FALSE, main = paste(iout, idsp)))
+		ci.lb <- with(idout, beta - SE * qnorm(0.05/2, lower.tail = FALSE))
+		ci.ub <- with(idout, beta + SE * qnorm(0.05/2, lower.tail = FALSE))
+		print(idforest <- forest(x = idout$beta, sei = idout$SE, slab = rep("", nrow(idout)), annotate = FALSE, main = paste(iout, idsp)))
+		print(text(idforest$textpos[1], seq(nrow(idout), 1, -1), idout$process, pos = 4))
 		dev.off()
 		# }
 		# rm(res.id)
