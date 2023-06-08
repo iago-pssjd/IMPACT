@@ -391,7 +391,7 @@ for(ixout in seq_along(outcomes)){
 		}
 		
 		if(!inherits(res.nomod, what = "try-error", which = FALSE)){
-			png(paste0(data_path, "graphics/iARIMAX/forestplots/", iout, "-", iproc, ".png"), bg = "transparent", width = 4800, height = 6400, units = "px", res = 320, type = "cairo")
+			png(paste0(data_NCpath, "graphics/iARIMAX/forestplots/", iout, "-", iproc, ".png"), bg = "transparent", width = 4800, height = 6400, units = "px", res = 320, type = "cairo")
 			print(forest(res.nomod, annotate = FALSE, slab = NA, order = "obs", lwd = 0.5))
 			dev.off()
 			mainOut[iopString, "beta"] <- res.nomod$beta[1]
@@ -426,7 +426,7 @@ for(ixout in seq_along(outcomes)){
 			}
 
 			if(!inherits(res.nomod, what = "try-error", which = FALSE)){
-				png(paste0(data_path, "graphics/iARIMAX/forestplots/", sarm, "/", iout, "-", iproc, ".png"), bg = "transparent", width = 4800, height = 6400, units = "px", res = 320, type = "cairo")
+				png(paste0(data_NCpath, "graphics/iARIMAX/forestplots/", sarm, "/", iout, "-", iproc, ".png"), bg = "transparent", width = 4800, height = 6400, units = "px", res = 320, type = "cairo")
 				print(forest(res.nomod, annotate = FALSE, slab = NA, order = "obs", lwd = 0.5))
 				dev.off()
 				mainOutArm[[sarm]][iopString, "beta"] <- res.nomod$beta[1]
@@ -523,8 +523,8 @@ for(arm in levels(impactdtres$Arm)){
 
 saveWorkbook(wb, paste0(data_path, "multilevel-models.xlsx"), overwrite = TRUE)
 saveWorkbook(wbcwb, paste0(data_path, "correlations-within-between.xlsx"), overwrite = TRUE)
-saveWorkbook(wbmeta, paste0(data_path, "iARIMAX.xlsx"), overwrite = TRUE)
-save(T1, T1arm, T1list, iDout, modOut, modOutArm, modArmOut, mainOut, mainOutArm, file = paste0(data_path, "iARIMAX.rdata"))
+saveWorkbook(wbmeta, paste0(data_NCpath, "iARIMAX.xlsx"), overwrite = TRUE)
+save(T1, T1arm, T1list, iDout, modOut, modOutArm, modArmOut, mainOut, mainOutArm, file = paste0(data_NCpath, "iARIMAX.rdata"))
 
 #R! Extra analysis
 
@@ -576,7 +576,7 @@ for(idx in seq_len(nrow(impactIDs))){
 #R!! Cluster analysis
 
 
-clusterdt <- dcast(iDout[, .(ParticipantID, outcome, beta, SE, process, Arm)], ParticipantID + outcome + Arm ~ process, value.var = c("beta", "SE"))
+clusterdt <- dcast(iDout[, .(ParticipantID, outcome, beta, SE, process, Arm, Responder_Post, Responder_FollowUp)], ParticipantID + outcome + Arm +Responder_Post + Responder_FollowUp ~ process, value.var = c("beta", "SE"))
 
 
 
@@ -585,7 +585,7 @@ sink(paste0(data_NCpath, "kmedoidsclustering.txt"), split = TRUE)
 for(ixout in seq_along(outcomes)){
 	iout <- outcomes[ixout]
 	print(iout)
-	tmpdt <- clusterdt[outcome == iout, !c("ParticipantID", "outcome", "Arm")]
+	tmpdt <- clusterdt[outcome == iout, .SD, .SDcols = patterns("^(beta|SE)_")]
 	bnkmd <- c(NA, -Inf)
 	for(nkmd in 2:9){
 		print(paste(nkmd, "clusters"))
@@ -593,19 +593,21 @@ for(ixout in seq_along(outcomes)){
 		pam.res <- pam(tmpdt, nkmd)
 		print("Summary of silhouette widths per cluster")
 		print(summary(pam.res$silinfo$clus.avg.widths))
-		print("(Weighted) Average silhouette width of total data set")
-		print(pam.res$silinfo$avg.width)
+		# print("(Weighted) Average silhouette width of total data set")
+		# print(pam.res$silinfo$avg.width)
+		print("Summary of k-medoids clustering")
+		print(summary(pam.res))
 		if(bnkmd[2] <= pam.res$silinfo$avg.width){
 			bnkmd[1] <- nkmd
 			bnkmd[2] <- pam.res$silinfo$avg.width
 		}
 		cat("\n")
 	}
-	# pam.res <- pam(tmpdt, bnkmd[1])
-	pam.res <- pam(tmpdt, 3)
+	pam.res <- pam(tmpdt, bnkmd[1])
+	# pam.res <- pam(tmpdt, 3)
 	png(paste0(data_NCpath, "graphics/iARIMAX/clusters/", iout, ".png"), bg = "transparent", width = 6400, height = 4800, units = "px", res = 320, type = "cairo")
 	par(mfcol = c(1,2))
-	plot(pam.res, which.plots = 1, main = paste("PAM clustering plot for", iout), col.p = clusterdt$Arm)
+	plot(pam.res, which.plots = 1, main = paste("PAM clustering plot for", iout), col.p = clusterdt$Responder_FollowUp)
 	plot(pam.res, which.plots = 2, main = paste("PAM clustering silhouette plot for", iout))
 	dev.off()
 	cat("\n\n")
