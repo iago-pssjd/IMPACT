@@ -115,11 +115,17 @@ wbmeta <- createWorkbook()
 #R!! Global variables
 
 EMA <- names(impactdt[, .SD, .SDcols = PainIntensity:Inaction])
-pOUTCOMES <- c("InterferLeasure", "InterferSocial", "InterferWork") # primary outcomes
-sOUTCOMES <- c("Sadness", "PainIntensity", "PainControl", "SleepDisturb", "Stress") # secondary outcomes
+pOUTCOMES <- c("Pain interference with leisure activities" = "InterferLeasure", "Pain interference with social activities" = "InterferSocial", "Pain interference with work-related activities" = "InterferWork") # primary outcomes
+sOUTCOMES <- c("Depressed mood" = "Sadness", "Pain intensity" = "PainIntensity", "Perceived control over pain" = "PainControl", "Sleep disturbance" = "SleepDisturb", "Perceived stress" = "Stress") # secondary outcomes
 outcomes <- c(pOUTCOMES, sOUTCOMES)
 processes <- setdiff(EMA, outcomes)
-
+names(processes)[processes == "Activity"] <- "Activity level"
+names(processes)[processes == "ExperientialAvoid"] <- "Experiential avoidance"
+names(processes)[processes == "NoContactMoment"] <- "Lack of contact with the present moment"
+names(processes)[processes == "SelfAsContent"] <- "Self as content"
+names(processes)[processes == "Fusion"] <- "Fusion"
+names(processes)[processes == "NoContactValues"] <- "Lack of contact with values"
+names(processes)[processes == "Inaction"] <- "Inaction"
 
 
 #R!! Data arranging
@@ -552,22 +558,29 @@ saveWorkbook(wbcov, paste0(data_NCpath, "iARIMAX.xlsx"), overwrite = TRUE)
 
 load(paste0(data_NCpath, "iARIMAX.rdata"))
 
+iDout[, outN := sapply(outcome, \(.out) names(outcomes)[outcomes == .out])]
+iDout[, procN := sapply(process, \(.proc) names(processes)[processes == .proc])]
+
 for(idx in seq_len(nrow(impactIDs))){
 	idsp <- impactIDs[idx, "ParticipantID"]
 	for(ixout in seq_along(outcomes)){
 		iout <- outcomes[ixout]
-		idout <-iDout[ParticipantID == idsp & outcome == iout, .(ParticipantID, outcome, beta, SE, process)]
-		# res.id <- try(rma(yi = beta, sei = SE, data = idout, measure = "GEN", method = "REML"), silent = TRUE)
-		# if(!inherits(res.id, what = "try-error", which = FALSE)){
-		png(paste0(data_NCpath, "graphics/iARIMAX/idplots/", iout, "-id", idsp, ".png"), bg = "transparent", width = 4800, height = 4800, units = "px", res = 320, type = "cairo")
-		# print(forest(x = res.id, slab = idout$process, main = paste(iout, idsp)))
-		ci.lb <- with(idout, beta - SE * qnorm(0.05/2, lower.tail = FALSE))
-		ci.ub <- with(idout, beta + SE * qnorm(0.05/2, lower.tail = FALSE))
-		print(idforest <- forest(x = idout$beta, sei = idout$SE, slab = rep("", nrow(idout)), col = ifelse(between(0, ci.lb, ci.ub), "red", "green"), annotate = FALSE, main = paste(iout, idsp)))
-		print(text(idforest$textpos[1], seq(nrow(idout), 1, -1), idout$process, pos = 4))
-		dev.off()
-		# }
-		# rm(res.id)
+		iout2 <- names(outcomes)[ixout]
+		idout <-iDout[ParticipantID == idsp & outcome == iout, .(ParticipantID, outcome, beta, SE, process, outN, procN)]
+		res.id <- try(rma(yi = beta, sei = SE, data = idout, measure = "GEN", method = "REML"), silent = TRUE)
+		if(!inherits(res.id, what = "try-error", which = FALSE)){
+			ci.lb <- with(idout, beta - SE * qnorm(0.05/2, lower.tail = FALSE))
+			ci.ub <- with(idout, beta + SE * qnorm(0.05/2, lower.tail = FALSE))
+			png(paste0(data_NCpath, "graphics/iARIMAX/idplots2/", iout, "-id", idsp, ".png"), bg = "transparent", width = 8.33, height = 6.61, units = "cm", pointsize = 5, res = 320, type = "cairo")
+			#svg(paste0(data_NCpath, "graphics/iARIMAX/idplots/", iout, "-id", idsp, ".svg"), bg = "transparent", width = 7, height = 7)
+			print(idforest <- forest(x = res.id, slab = idout$procN, main = NA))
+			par(new = TRUE)
+			forest(res.id$yi, res.id$vi, level = 95, lwd = 1, annotate = FALSE, psize = NA, refline = NA, slab = NA, xaxt = "n", xlab = "", lty = c("solid", "solid"), col = ifelse(between(0, ci.lb, ci.ub), "red", "green"), xlim = idforest$xlim, ylim = idforest$ylim)
+			# print(idforest <- forest(x = idout$beta, sei = idout$SE, slab = rep("", nrow(idout)), col = ifelse(between(0, ci.lb, ci.ub), "red", "green"), annotate = FALSE, main = paste(iout, idsp)))
+			# print(text(idforest$textpos[1], seq(nrow(idout), 1, -1), idout$process, pos = 4))
+			dev.off()
+		}
+		rm(res.id)
 	}
 }
 
