@@ -575,7 +575,7 @@ for(idx in seq_len(nrow(impactIDs))){
 			#svg(paste0(data_NCpath, "graphics/iARIMAX/idplots/", iout, "-id", idsp, ".svg"), bg = "transparent", width = 7, height = 7)
 			print(idforest <- forest(x = res.id, slab = idout$procN, main = NA))
 			par(new = TRUE)
-			forest(res.id$yi, res.id$vi, level = 95, lwd = 1, annotate = FALSE, psize = NA, refline = NA, slab = NA, xaxt = "n", xlab = "", lty = c("solid", "solid"), col = ifelse(between(0, ci.lb, ci.ub), "red", "green"), xlim = idforest$xlim, ylim = idforest$ylim)
+			forest(res.id$yi, res.id$vi, level = 95, lwd = 1, annotate = FALSE, psize = NA, refline = NA, slab = NA, xaxt = "n", xlab = "", lty = c("solid", "solid"), col = ifelse(na.omit(between(0, ci.lb, ci.ub, NAbounds = NA)), "red", "green"), xlim = idforest$xlim, ylim = idforest$ylim)
 			# print(idforest <- forest(x = idout$beta, sei = idout$SE, slab = rep("", nrow(idout)), col = ifelse(between(0, ci.lb, ci.ub), "red", "green"), annotate = FALSE, main = paste(iout, idsp)))
 			# print(text(idforest$textpos[1], seq(nrow(idout), 1, -1), idout$process, pos = 4))
 			dev.off()
