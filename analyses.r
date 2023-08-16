@@ -26,10 +26,11 @@ if(Sys.info()["sysname"] == "Linux"){
 
 options(max.print=99999)
 
-#R!! Libraries
+#R!!! Libraries
 
 
 library(openxlsx) # createWorkbook
+library(e1071)
 library(cluster)
 library(metafor)
 library(forecast)
@@ -107,8 +108,8 @@ setDT(respondersdt)
 impactdt <- merge(impactdt, respondersdt, by.x = "ParticipantID", by.y = "ID", all.x = TRUE, all.y = FALSE)
 
 # wb <- createWorkbook()
-# wbcwb <- createWorkbook()
-wbmeta <- createWorkbook()
+wbcwb <- createWorkbook()
+# wbmeta <- createWorkbook()
 
 
 
@@ -217,25 +218,78 @@ for(arm in levels(impactdtres$Arm)){
 
 #R!! Global correlations
 
-cwbEMA <- statsBy(impactdtres[, .SD, .SDcols = c("ParticipantID", EMA)], group = "ParticipantID", cors = FALSE)
+cwbEMA <- statsBy(impactdtres[, .SD, .SDcols = c("ParticipantID", EMA)], group = "ParticipantID", cors = TRUE)
+
+#R!!! Within-correlations distribution
+
+crOut <- matrix(data = NA, nrow = length(processes) * length(outcomes), 12)
+rownames(crOut) <- paste(rep(outcomes, each = length(processes)), processes, sep = "-")
+colnames(crOut) <- c("mean", "SD", "lower2.5", "upper97.5", "skewness", "kurtosis", "min", "Q1", "median", "Q3", "max", "IQR")
+
+crOutArm <- list(crOut, crOut, crOut)
+names(crOutArm) <- sub("\\+", "", levels(impactdtres$Arm))
+
+
+for(ixout in seq_along(outcomes)){
+	for(ixproc in seq_along(processes)){
+		iout <- outcomes[ixout]
+		iproc <- processes[ixproc]
+		iopString <- paste(iout, iproc, sep = "-")
+		crdist <- sapply(cwbEMA$r, \(.cr) .cr[iout, iproc])
+		crOut[iopString, c("mean")] <- mean(crdist, na.rm = TRUE)
+		crOut[iopString, c("SD")] <- sd(crdist, na.rm = TRUE)
+		crOut[iopString, c("lower2.5", "upper97.5")] <- t.test(crdist)$conf.int
+		crOut[iopString, c("min")] <- min(crdist, na.rm = TRUE)
+		crOut[iopString, c("max")] <- max(crdist, na.rm = TRUE)
+		crOut[iopString, c("Q1", "Q3")] <- quantile(crdist, probs = c(0.25, 0.75), na.rm = TRUE)
+		crOut[iopString, c("median")] <- median(crdist, na.rm = TRUE)
+		crOut[iopString, c("IQR")] <- IQR(crdist, na.rm = TRUE)
+		crOut[iopString, c("skewness")] <- skewness(crdist, na.rm = TRUE)
+		crOut[iopString, c("kurtosis")] <- kurtosis(crdist, na.rm = TRUE)
+	}
+}
 
 # saving matrices
-sheet_list <- list("Within correlations" = cwbEMA$rwg, "Within correlation p-values" = cwbEMA$pwg, "Between correlations" = cwbEMA$rbg, "Between correlation p-values" = cwbEMA$pbg)
+sheet_list <- list("Within correlations" = cwbEMA$rwg, "Within correlation p-values" = cwbEMA$pwg, "Within cor. summary" = crOut, "Between correlations" = cwbEMA$rbg, "Between correlation p-values" = cwbEMA$pbg)
 for(sheetname in names(sheet_list)){
 	addWorksheet(wbcwb, sheetName = sheetname)
 	writeData(wbcwb, sheet = sheetname, sheet_list[[sheetname]], rowNames = TRUE)
 }
 
 
+
+
+
 #R!! Correlation within-between per arm
 
 
 for(arm in levels(impactdtres$Arm)){
-	cwbEMA <- statsBy(impactdtres[Arm == arm, .SD, .SDcols = c("ParticipantID", EMA)], group = "ParticipantID")
+	cwbEMA <- statsBy(impactdtres[Arm == arm, .SD, .SDcols = c("ParticipantID", EMA)], group = "ParticipantID", cors = TRUE)
 	sarm <- sub("\\+", "", arm)
 
+
+	for(ixout in seq_along(outcomes)){
+		for(ixproc in seq_along(processes)){
+			iout <- outcomes[ixout]
+			iproc <- processes[ixproc]
+			iopString <- paste(iout, iproc, sep = "-")
+			crdist <- sapply(cwbEMA$r, \(.cr) .cr[iout, iproc])
+			crOutArm[[sarm]][iopString, c("mean")] <- mean(crdist, na.rm = TRUE)
+			crOutArm[[sarm]][iopString, c("SD")] <- sd(crdist, na.rm = TRUE)
+			crOutArm[[sarm]][iopString, c("lower2.5", "upper97.5")] <- t.test(crdist)$conf.int
+			crOutArm[[sarm]][iopString, c("min")] <- min(crdist, na.rm = TRUE)
+			crOutArm[[sarm]][iopString, c("max")] <- max(crdist, na.rm = TRUE)
+			crOutArm[[sarm]][iopString, c("Q1", "Q3")] <- quantile(crdist, probs = c(0.25, 0.75), na.rm = TRUE)
+			crOutArm[[sarm]][iopString, c("median")] <- median(crdist, na.rm = TRUE)
+			crOutArm[[sarm]][iopString, c("IQR")] <- IQR(crdist, na.rm = TRUE)
+			crOutArm[[sarm]][iopString, c("skewness")] <- skewness(crdist, na.rm = TRUE)
+			crOutArm[[sarm]][iopString, c("kurtosis")] <- kurtosis(crdist, na.rm = TRUE)
+		}
+	}
+
+
 	# saving matrices
-	sheet_list <- list("Within correlations" = cwbEMA$rwg, "Within p-values" = cwbEMA$pwg, "Between correlations" = cwbEMA$rbg, "Between p-values" = cwbEMA$pbg)
+	sheet_list <- list("Within correlations" = cwbEMA$rwg, "Within p-values" = cwbEMA$pwg, "Within cor. summary" = crOutArm[[sarm]], "Between correlations" = cwbEMA$rbg, "Between p-values" = cwbEMA$pbg)
 
 	names(sheet_list) <- paste(names(sheet_list), sarm, sep = "-")
 
@@ -528,7 +582,7 @@ for(arm in levels(impactdtres$Arm)){
 #R! Save
 
 saveWorkbook(wb, paste0(data_path, "multilevel-models.xlsx"), overwrite = TRUE)
-saveWorkbook(wbcwb, paste0(data_path, "correlations-within-between.xlsx"), overwrite = TRUE)
+saveWorkbook(wbcwb, paste0(data_NCpath, "correlations-within-between.xlsx"), overwrite = TRUE)
 saveWorkbook(wbmeta, paste0(data_NCpath, "iARIMAX.xlsx"), overwrite = TRUE)
 save(T1, T1arm, T1list, iDout, modOut, modOutArm, modArmOut, mainOut, mainOutArm, file = paste0(data_NCpath, "iARIMAX.rdata"))
 
