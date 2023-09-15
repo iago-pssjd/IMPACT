@@ -639,12 +639,6 @@ for(idx in seq_len(nrow(impactIDs))){
 		# par(new = TRUE)
 		# forest(res.id$yi, res.id$vi, level = 95, lwd = 1, annotate = FALSE, psize = NA, refline = NA, slab = NA, xaxt = "n", xlab = "", lty = c("solid", "solid"), col = ifelse(na.omit(between(0, ci.lb, ci.ub, NAbounds = NA)), "red", "green"), xlim = idforest$xlim, ylim = idforest$ylim)
 		print(idforest <- forest(x = idout$beta, sei = idout$SE, slab = idout$procN, lty = c("blank", "blank"), col = "black", annotate = TRUE, main = NA))
-		# print(idforest <- forest(x = idout$beta, sei = idout$SE, slab = rep("", nrow(idout)), col = ifelse(between(0, ci.lb, ci.ub), "red", "green"), annotate = TRUE, main = NA))
-		# adding left text
-		# print(text(idforest$textpos[1], seq(nrow(idout), 1, -1), idout$procN, pos = 4))
-		# adding right black text
-		# par(new = TRUE)
-		# forest(x = idout$beta, sei = idout$SE, lwd = 1, annotate = TRUE, refline = NA, slab = NA, xaxt = "n", xlab = "", lty = c("blank", "blank"), col = "black", xlim = idforest$xlim, ylim = idforest$ylim)
 		# next: adding coloured CI lines on (in front of) estimate black point
 		par(new = TRUE)
 		forest(x = idout$beta, sei = idout$SE, lwd = 1, annotate = FALSE, psize = NA, refline = NA, slab = NA, xaxt = "n", xlab = "", lty = c("solid", "solid"), col = ifelse(between(0, ci.lb, ci.ub, NAbounds = NA), "red", "green"), xlim = idforest$xlim, ylim = idforest$ylim)
