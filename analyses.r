@@ -134,6 +134,10 @@ names(processes)[processes == "Inaction"] <- "Inaction"
 # remove 30 participants exhibiting no variability on at least one EMA item
 impactdtres <- impactdt[!ParticipantID %in% impactdt[, lapply(.SD, \(.x) uniqueN(.x) - any(is.na(.x))), by = ParticipantID, .SDcols = EMA][, min_var := rowMins(as.matrix(.SD)), .SDcols = !c('ParticipantID')][min_var <= 1]$ParticipantID]
 
+impactIDs <- unique(impactdtres[, .(ParticipantID, Arm, Wave, N_sessions, Completers, Years_diagnosis, Age, Gender, Depression_diagnosis, (.SD)), .SDcols = BPI_Pre:Responder_FollowUp])[, `:=` (age = droplevels(cut(Age, breaks = c(0,50,55,60,+Inf), right = TRUE)), 
+																							    Gender = droplevels(Gender),
+																							    years_diagnosis = droplevels(cut(Years_diagnosis, breaks = c(0,5,10,20,+Inf), right = TRUE)))]
+
 # impactdtres[, uniqueN(ParticipantID), by = Arm]
 
 
@@ -302,9 +306,6 @@ for(arm in levels(impactdtres$Arm)){
 
 #R! iARIMAX models
 
-impactIDs <- unique(impactdtres[, .(ParticipantID, Arm, Wave, N_sessions, Completers, Years_diagnosis, Age, Gender, Depression_diagnosis, (.SD)), .SDcols = BPI_Pre:Responder_FollowUp])[, `:=` (age = droplevels(cut(Age, breaks = c(0,50,55,60,+Inf), right = TRUE)), 
-																							    Gender = droplevels(Gender),
-																							    years_diagnosis = droplevels(cut(Years_diagnosis, breaks = c(0,5,10,20,+Inf), right = TRUE)))]
 ARIMA_parameters <- c("p", "d", "q", "s", "P", "D", "Q")
 beta_bands <- c("(-Inf, -0.3)", "[-0.3, -0.2)", "[-0.2, -0.1)", "[-0.1, 0.1]", "(0.1, 0.2]", "(0.2, 0.3]", "(0.3, +Inf)")
 # moderators <- c("Gender", "age", "Depression_diagnosis", "BPI_Pre", "NRS_Pre", "DASS21_Ans_Pre", "DASS21_Dep_Pre", "DASS21_St_Pre", "PCS_Pre", "CPAQ_Pre", "BADSSF_Pre", "PIPS_Pre")
@@ -612,8 +613,14 @@ saveWorkbook(wbcov, paste0(data_NCpath, "iARIMAX.xlsx"), overwrite = TRUE)
 
 load(paste0(data_NCpath, "iARIMAX.rdata"))
 
-iDout[, outN := sapply(outcome, \(.out) names(outcomes)[outcomes == .out])]
-iDout[, procN := sapply(process, \(.proc) names(processes)[processes == .proc])]
+qn95 <- qnorm(0.05/2, lower.tail = FALSE)
+
+iDout[, `:=` (outN = sapply(outcome, \(.out) names(outcomes)[outcomes == .out]), 
+	      procN = sapply(process, \(.proc) names(processes)[processes == .proc]), 
+	      ci.lb = beta - SE * qn95, 
+	      ci.ub = beta + SE * qn95,
+	      direction = beta > 0)
+      ][, `:=` (blu = !between(0, ci.lb, ci.ub, incbounds = TRUE))]
 
 for(idx in seq_len(nrow(impactIDs))){
 	idsp <- impactIDs[idx, "ParticipantID"]
@@ -638,7 +645,7 @@ for(idx in seq_len(nrow(impactIDs))){
 	}
 }
 
-
+#iDout[!is.na(Responder_Post)][, keyby = .(Arm, Responder_Post)]
 
 #R!! Cluster analysis
 
