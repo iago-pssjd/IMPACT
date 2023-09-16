@@ -620,7 +620,15 @@ iDout[, `:=` (outN = sapply(outcome, \(.out) names(outcomes)[outcomes == .out]),
 	      ci.lb = beta - SE * qn95, 
 	      ci.ub = beta + SE * qn95,
 	      direction = beta > 0)
-      ][, `:=` (blu = !between(0, ci.lb, ci.ub, incbounds = TRUE))]
+      ][, `:=` (blu = !between(0, ci.lb, ci.ub, incbounds = TRUE))
+      ][, `:=` (byFactor = interaction(Arm, Responder_Post, as.factor(outcome), as.factor(process), as.factor(direction), as.factor(blu)))]
+
+byFactor <- unique(iDout[, .(Arm, Responder_Post, outcome, process, direction, blu)])
+
+
+
+iDout[!is.na(Responder_Post) & !is.na(ci.lb)][CJ(Arm, Responder_Post, outcome, process, direction, blu, unique = TRUE), on = .(Arm, Responder_Post, outcome, process, direction, blu) , .N, keyby = .EACHI][, p := round(100*N / sum(N), 2), keyby = .(Arm, Responder_Post, outcome, process, direction)][blu == TRUE, !c("blu")]
+
 
 for(idx in seq_len(nrow(impactIDs))){
 	idsp <- impactIDs[idx, "ParticipantID"]
@@ -648,7 +656,6 @@ for(idx in seq_len(nrow(impactIDs))){
 	}
 }
 
-#iDout[!is.na(Responder_Post)][, keyby = .(Arm, Responder_Post)]
 
 #R!! Cluster analysis
 
