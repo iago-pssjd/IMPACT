@@ -620,10 +620,8 @@ iDout[, `:=` (outN = sapply(outcome, \(.out) names(outcomes)[outcomes == .out]),
 	      ci.lb = beta - SE * qn95, 
 	      ci.ub = beta + SE * qn95,
 	      direction = beta > 0)
-      ][, `:=` (blu = !between(0, ci.lb, ci.ub, incbounds = TRUE))
-      ][, `:=` (byFactor = interaction(Arm, Responder_Post, as.factor(outcome), as.factor(process), as.factor(direction), as.factor(blu)))]
+      ][, `:=` (blu = !between(0, ci.lb, ci.ub, incbounds = TRUE))]
 
-byFactor <- unique(iDout[, .(Arm, Responder_Post, outcome, process, direction, blu)])
 
 
 
