@@ -28,7 +28,7 @@ options(max.print=99999)
 
 #R!!! Libraries
 
-
+library(flextable)
 library(openxlsx) # createWorkbook
 library(e1071)
 library(cluster)
@@ -623,11 +623,6 @@ iDout[, `:=` (outN = sapply(outcome, \(.out) names(outcomes)[outcomes == .out]),
       ][, `:=` (blu = !between(0, ci.lb, ci.ub, incbounds = TRUE))]
 
 
-
-
-iDout[!is.na(Responder_Post) & !is.na(ci.lb)][CJ(Arm, Responder_Post, outcome, process, direction, blu, unique = TRUE), on = .(Arm, Responder_Post, outcome, process, direction, blu) , .N, keyby = .EACHI][, p := round(100*N / sum(N), 2), keyby = .(Arm, Responder_Post, outcome, process, direction)][blu == TRUE, !c("blu")]
-
-
 for(idx in seq_len(nrow(impactIDs))){
 	idsp <- impactIDs[idx, "ParticipantID"]
 	for(ixout in seq_along(outcomes)){
@@ -653,6 +648,38 @@ for(idx in seq_len(nrow(impactIDs))){
 		# rm(res.id)
 	}
 }
+
+
+outTable <- iDout[!is.na(Responder_Post) & !is.na(ci.lb)
+		  ][CJ(Arm, Responder_Post, outN, procN, direction, blu, unique = TRUE), on = .(Arm, Responder_Post, outN, procN, direction, blu) , .N, keyby = .EACHI
+		  ][, p := round(100*N / sum(N), 2), keyby = .(Arm, Responder_Post, outN, procN, direction)
+		  ][blu == TRUE, !c("blu")
+		  ][, direction := as.character(direction)
+		  ][.(direction = c("FALSE", "TRUE"), to = c("Negative", "Positive")), on = "direction", direction := i.to
+		  ][outN %in% c("Pain intensity", "Depressed mood")]
+
+
+ft <- dcast(outTable, Arm + Responder_Post + procN ~ outN + direction, value.var = "p", sep = " ") |> 
+	as_grouped_data(groups = c("Arm", "Responder_Post")) |>
+	as_flextable() |>
+	bold(part = "header", bold = TRUE) |>
+	bold(j = 1, i = ~ !is.na(Arm), bold = TRUE, part = "body") |>
+	bold(j = 1, i = ~ !is.na(Responder_Post), bold = TRUE, part = "body") |>
+	set_table_properties(layout = "fixed") |>
+	set_header_labels(procN = "", 
+			  "Depressed mood Negative" = "Negative", 
+			  "Depressed mood Positive" = "Positive", 
+			  "Pain intensity Negative" = "Negative", 
+			  "Pain intensity Positive" = "Positive") |>
+	add_header_row(values = c("", "Depressed mood", "Pain intensity"), colwidths = c(1,2,2)) |>
+	autofit() |>
+	width(j = 1, width = 5, unit = "cm") |>
+	width(j = 2:4, width = 2, unit = "cm") |>
+	merge_v(j = 1, target = "procN", part = "header") |>
+	fontsize(size = 9, part = "all")
+
+save_as_docx(ft, path = "percSign.docx")
+
 
 
 #R!! Cluster analysis
